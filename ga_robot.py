@@ -1,15 +1,19 @@
 import numpy as np
-from wheeled_robot_class import Robot, Walls, Envir
+from wheeled_robot_classv2 import Robot, Walls, Envir
 import pygame
 
-chromosome = np.array([[0.02497166, 0.44903877, 0.23747856, 0.04961437],
-                       [0.72459829, 0.111593, 0.6083195, 0.28104975],
-                       [0.17349605, 0.37975152, 0.80144578, 0.39209358],
-                       [0.75076965, 0.1254863, 0.77277142, 0.23693332],
-                       [0.67739313, 0.56578155, 0.92914472, 0.38732252],
-                       [0.06616519, 0.01915549, 0.82685856, 0.52473564]])
+chromosome = np.array([[-25., -114.],
+                       [-101., -101.],
+                       [-212., -114.],
+                       [-101., -101.],
+                       [-101., -162.],
+                       [-101., -101.],
+                       [-162., -101.],
+                       [-212., 66.],
+                       [-101., 144.]],
+                      )
 
-time = 15000
+time = 30000
 # Simulation loop
 pygame.init()
 
@@ -17,8 +21,8 @@ pygame.init()
 start = (300, 200)
 img_path = "/Users/anishjadoenathmisier/Documents/GitHub/BioInspiredIntelligence/robot.png"
 
-robot = (Robot(start, img_path, 25, chromosome))
-dims = (1400, 1000)
+robot = (Robot(start, img_path, 20, chromosome))
+dims = (1200, 800)
 env = Envir(dims)
 wall = Walls(20, dims)
 

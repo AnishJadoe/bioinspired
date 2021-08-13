@@ -3,7 +3,20 @@ import numpy as np
 import pygame
 import matplotlib.pyplot as plt
 
+# Initialize the robot
+start = (300, 200)
+img_path = "/Users/anishjadoenathmisier/Documents/GitHub/BioInspiredIntelligence/robot.png"
+clock = pygame.time.Clock()
 np.random.RandomState()
+
+
+################ FUNCTIONS ################
+
+def get_init_pop(n_robots):
+    population = list()
+    for i in range(0, n_robots):
+        population.append(np.random.randint(low=-255, high=255, size=(9, 2)))
+    return population
 
 
 def calc_distance(coord1, coord2):
@@ -21,16 +34,108 @@ def calc_angle(coord1, coord2):
     return orient
 
 
-class Walls:
+def run_simulation(time, pop, n_robots):
+    pygame.init()
+
+    global start
+    global img_path
+    global clock
+
+    ls_robots = list()
+    scores = list()
+
+    tot_abs_dist = list()
+    tot_avg = list()
+    tot_coll = list()
+    tot_reward = list()
+    tot_flips = list()
+
+    dims = (1200, 800)
+
+    environment = Envir(dims)
+    environment.map.fill((255, 255, 255))
+
+    # Obtain the walls
+    wall = Walls(20, dims)
+
+    draw = Draw(dims)
+
+    for i in range(n_robots):
+        ls_robots.append(Robot(start, img_path, 20, pop[i]))
+
+    dt = 0
+    lasttime = pygame.time.get_ticks()
+    # Simulation loop
+    while pygame.time.get_ticks() <= time:
+        # clock.tick(120)
+
+        for event in pygame.event.get():
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == 48:
+                    robot.x = 200
+                    robot.y = 200
+
+            if event.type == pygame.QUIT:
+                pygame.quit()
+
+            for robot in ls_robots:
+                robot.move(environment.height, environment.width, dt, event, auto=True)
+
+        dt = (pygame.time.get_ticks() - lasttime) / 1000
+        lasttime = pygame.time.get_ticks()
+
+        pygame.display.update()
+        environment.map.fill((255, 255, 255))
+        wall.draw(environment.map,ls_robots)
+
+        for robot in ls_robots:
+            robot.get_sensor(wall.obstacles, environment.map)
+            if sum(robot.sensor[1:]) > 0:
+                robot.get_collision(wall.obstacles)
+            robot.move(environment.height, environment.width, dt, auto=True)
+
+            robot.draw(environment.map)
+
+        draw.write_info(gen=GA.gen, time=pygame.time.get_ticks() / 1000, map=environment.map)
+
+    pygame.quit()
+
+    for robot in ls_robots:
+        scores.append(robot.get_reward(time))
+
+    for robot in ls_robots:
+        tot_avg.append(robot.avg_dist)
+        tot_abs_dist.append(robot.dist_travelled)
+        tot_coll.append(robot.collision)
+        tot_reward.append(robot.get_reward(time))
+        tot_flips.append(robot.flip)
+
+    GA.reward_gen.append(np.mean(tot_reward))
+    GA.dist_gen.append(np.mean(tot_abs_dist))
+    GA.rel_dist_gen.append(np.mean(tot_avg))
+    GA.coll_gen.append(np.mean(tot_coll))
+
+    return scores
+
+
+################ ClASSES ################
+
+class Walls:  # change name to world
 
     def __init__(self, size, dimensions):
         self.black = (0, 0, 0)
+        self.yellow = (255, 255, 0)
+
         self.size = size
         self.width = dimensions[1]
         self.height = dimensions[0]
+        self.amount_rewards = 20
+
         self.cellMAP = self.get_maze_map()
         self.grid = self.get_grid()
         self.obstacles = self.get_obs()
+        self.rewards = self.get_rewards()
 
     def get_maze_map(self):
 
@@ -39,9 +144,9 @@ class Walls:
 
         np.random.seed(42)
         cellMAP = np.random.choice([1, 0], size=(int(self.height / self.size), int(self.width / self.size)),
-                                   p=[0.75, 0.25])
+                                   p=[0.80, 0.20])
 
-        generations = 50
+        generations = 1
         GRIDHEIGHT = int(self.height / self.size)
         GRIDWIDTH = int(self.width / self.size)
 
@@ -86,6 +191,7 @@ class Walls:
                                 cellMAP[row][column] = WALL
                             else:
                                 cellMAP[row][column] = FLOOR
+
         return cellMAP
 
     def get_grid(self):
@@ -115,22 +221,39 @@ class Walls:
 
         return obs
 
-    def draw(self, map):
+    def get_rewards(self):
+
+        ls_coors = []
+        ls_rewards = []
+
+        for index in range(0, len(self.grid)):
+            if self.cellMAP.flatten()[index] == 1:
+                ls_coors.append(self.grid[index])
+
+        for i in range(0, self.amount_rewards):
+            reward_idx = np.random.randint(low=0, high=len(ls_coors))
+            ls_rewards.append(ls_coors[reward_idx])
+
+        return ls_rewards
+
+    def draw(self, map, robots):
 
         for ob in self.obstacles:
             pygame.draw.rect(map, self.black, ob, 0)
+
+        for reward in self.rewards:
+            pygame.draw.rect(map, self.yellow, reward, 0)
+
+            for robot in robots:
+                if reward.colliderect(robot.rect):
+                    self.rewards.pop(self.rewards.index(reward))
+
+
 
 
 class Envir:
 
     def __init__(self, dimensions):
-        # colors
-        self.black = (0, 0, 0)
-        self.white = (255, 255, 255)
-        self.green = (0, 255, 0)
-        self.red = (255, 0, 0)
-        self.blue = (0, 0, 255)
-        self.yellow = (255, 255, 0)
 
         # map dims
         self.height = dimensions[0]
@@ -141,19 +264,6 @@ class Envir:
         self.map = pygame.display.set_mode((self.height,
                                             self.width))
 
-        self.font = pygame.font.Font('freesansbold.ttf', 50)
-        self.text = self.font.render('default', True, self.white, self.black)
-        self.textRect = self.text.get_rect()
-        self.textRect.center = (dimensions[0] - 600,
-                                dimensions[1] - 100)
-        self.trail_set = []
-
-    def write_info(self, Vl, Vr, theta):
-
-        txt = f"Vl = {Vl} Vr = {Vr} theta = {int(math.degrees(theta))}"
-        self.text = self.font.render(txt, True, self.white, self.black)
-        self.map.blit(self.text, self.textRect)
-
     def trail(self, pos):
         for i in range(0, len(self.trail_set) - 1):
             pygame.draw.line(self.map, self.yellow, (self.trail_set[i][0], self.trail_set[i][1]),
@@ -163,20 +273,44 @@ class Envir:
         self.trail_set.append(pos)
 
 
+class Draw:
+
+    def __init__(self, dimensions):
+        # colors
+        self.black = (0, 0, 0)
+        self.white = (255, 255, 255)
+        self.green = (0, 255, 0)
+        self.red = (255, 0, 0)
+        self.blue = (0, 0, 255)
+        self.yellow = (255, 255, 0)
+
+        self.font = pygame.font.Font('freesansbold.ttf', 50)
+        self.text = self.font.render('default', True, self.white, self.black)
+        self.textRect = self.text.get_rect()
+        self.textRect.center = (dimensions[0] - 600,
+                                dimensions[1] - 100)
+        self.trail_set = []
+
+    def write_info(self, map, gen, time):
+        txt = f"Generation: {gen}, Time: {time}"
+        self.text = self.font.render(txt, True, self.white, self.black)
+        map.blit(self.text, self.textRect)
+
+
 class Robot:
 
     def __init__(self, startpos, robot_img, width, chromosome):
 
         self.m2p = 3779.52  # meters 2 pixels
-        self.w = width
+        self.w = width  * 10
         self.init_pos = startpos
         self.x = startpos[0]
         self.y = startpos[1]
         self.theta = 0
-        self.vl = 0.01 * self.m2p
-        self.vr = 0.01 * self.m2p
-        self.maxspeed = 0.5 * self.m2p
-        self.minspeed = -0.5 * self.m2p
+        self.vl = 0.01
+        self.vr = 0.01
+        self.maxspeed = 0.05 * self.m2p
+        self.minspeed = -0.05 * self.m2p
 
         self.ls_tot_speed = list()
 
@@ -188,12 +322,16 @@ class Robot:
         self.dist_travelled = 0
         self.avg_dist = 0
         self.flip = 0
+        self.stuck = 0
 
         self.sensor = [0, 0, 0, 0, 0, 0]  # 1 tactile sensor (sensor[0]) and 5 ultrasound
 
-        self.width = 25
-        self.length = 25
+        self.width = width
+        self.length = width
         self.collision = 0
+        self.reward = 0
+
+
 
         self.img = pygame.image.load(robot_img)
         self.img = pygame.transform.scale(self.img, (self.width, self.length))
@@ -203,17 +341,24 @@ class Robot:
 
         self.chromosome = chromosome
 
-    def draw(self, map):
-        map.blit(self.rotated, self.rect)
+    def draw(self, world):
+        world.blit(self.rotated, self.rect)
 
     def get_collision(self, obstacles):
 
         self.sensor[0] = 0
 
-        for obstacle in range(0, len(obstacles)):
-            if self.rect.colliderect(obstacles[obstacle]):
+        for obstacle in obstacles:
+            if self.rect.colliderect(obstacle):
                 self.collision += 1
                 self.sensor[0] = 1
+
+    def get_reward(self, rewards):
+
+        for reward in rewards:
+            if self.rect.colliderect(reward):
+                self.reward += 1
+                rewards.pop(reward)
 
     def move(self, height, width, dt, event=None, auto=False):
 
@@ -221,22 +366,26 @@ class Robot:
         self.ls_y.append(self.y)
         self.ls_theta.append(self.theta)
 
+        if self.x == self.ls_x[-1] and self.y == self.ls_y[-1]:
+            self.stuck += 1
+
         self.ls_tot_speed.append(self.vl + self.vr)
 
         if auto:
 
-            states = np.zeros(shape=(1, 7), dtype=object)
-            states[:, 0:-1] = self.sensor
-            states[:, -1] = self.theta
+            states = np.zeros(shape=(1, 9), dtype=object)
+            states[:, 0:-3] = self.sensor
+            # Give the robot its own state as input
+            states[:, -3] = self.theta
+            states[:, -2] = self.vl
+            states[:, -1] = self.vl
             actions = np.dot(states, self.chromosome)
 
             # Instead of having 2 options, the robot now has 4
             # such that it is also able to brake
 
-            self.vl += actions[:, 0]
-            self.vr += actions[:, 1]
-            # self.vr += actions[:, 2]
-            # self.vr -= actions[:, 3]
+            self.vl += actions[:, 0] * 0.01
+            self.vr += actions[:, 1] * 0.01
 
         else:
             if event is not None:
@@ -255,27 +404,42 @@ class Robot:
                         self.vr -= 0.01 * self.m2p
 
         if self.sensor[0]:
+            # self.x = self.init_pos[0]
+            # self.y = self.init_pos[1]
+            # self.vr = 0.01*self.m2p
+            # self.vl = 0.01*self.m2p
 
-            if 0.5 * math.pi > abs(self.theta) >= 0:
-                # print('top right')
-                self.x = self.x - 0.05
-                self.y = self.y - 0.05
+            self.vr = -self.vr * 0.8
+            self.vl = -self.vl * 0.8
 
-            if 1 * math.pi > abs(self.theta) >= 0.5 * math.pi:
-                # print('top left')
-                self.x = self.x + 0.05
-                self.y = self.y + 0.05
-
-            if 1.5 * math.pi > abs(self.theta) >= 1 * math.pi:
-                # print('bottom left')
-                self.x = self.x + 0.05
-                self.y = self.y - 0.05
-
-            else:
-                # print('bottom right')
-                self.x = self.x - 0.05
-                self.y = self.y + 0.05
-
+            #
+            # if 0.5 * math.pi > abs(self.theta) >= 0:
+            #     # print('top right')
+            #     # self.x = self.x - 0.05
+            #     # self.y = self.y - 0.05
+            #     self.x = self.ls_x[-1]
+            #     self.y = self.ls_y[-1]
+            #
+            # if 1 * math.pi > abs(self.theta) >= 0.5 * math.pi:
+            #     # print('top left')
+            #     # self.x = self.x + 0.05
+            #     # self.y = self.y + 0.05
+            #     self.x = self.ls_x[-1]
+            #     self.y = self.ls_y[-1]
+            #
+            # if 1.5 * math.pi > abs(self.theta) >= 1 * math.pi:
+            #     # print('bottom left')
+            #     # self.x = self.x + 0.05
+            #     # self.y = self.y - 0.05
+            #     self.x = self.ls_x[-1]
+            #     self.y = self.ls_y[-1]
+            #
+            # else:
+            #     # print('bottom right')
+            #     # self.x = self.x - 0.05
+            #     # self.y = self.y + 0.05
+            #     self.x = self.ls_x[-1]
+            #     self.y = self.ls_y[-1]
         else:
 
             self.x += ((self.vl + self.vr) / 2) * math.cos(self.theta) * dt
@@ -283,8 +447,8 @@ class Robot:
 
         self.omega = (self.vr - self.vl) / self.w
 
-        if self.omega >= 0.001 * math.pi:
-            self.omega = 0.001 * math.pi
+        if self.omega >= 0.02 * math.pi:
+            self.omega = 0.02 * math.pi
 
         self.theta += self.omega * dt
 
@@ -329,30 +493,30 @@ class Robot:
             for obstacle in obstacles:
                 dist_to_wall = calc_distance((self.x, self.y), (obstacle.x, obstacle.y))
 
-                if dist_to_wall <= 65:
+                if dist_to_wall <= 75:
                     angle_w_wall = calc_angle((self.x, self.y), (obstacle.x, obstacle.y))
 
                     if 0 <= angle_w_wall < (math.pi * 2 * 1 / 5):
                         pygame.draw.line(map, (255, 0, 0), (self.x, self.y), (obstacle.x, obstacle.y))
-                        self.sensor[1] = 1 * (65 - dist_to_wall)
+                        self.sensor[1] = 1 * 1 / max(1, dist_to_wall)
 
                     elif (math.pi * 2 * 1 / 5) <= angle_w_wall < (math.pi * 2 * 2 / 5):
                         pygame.draw.line(map, (255, 0, 0), (self.x, self.y), (obstacle.x, obstacle.y))
-                        self.sensor[2] = 1 * (65 - dist_to_wall)
+                        self.sensor[2] = 1 * 1 / max(1, dist_to_wall)
 
                     elif (math.pi * 2 * 2 / 5) <= angle_w_wall < (math.pi * 2 * 3 / 5):
                         pygame.draw.line(map, (255, 0, 0), (self.x, self.y), (obstacle.x, obstacle.y))
-                        self.sensor[3] = 1 * (65 - dist_to_wall)
+                        self.sensor[3] = 1 * 1 / max(1, dist_to_wall)
 
                     elif (math.pi * 2 * 3 / 5) <= angle_w_wall < (math.pi * 2 * 4 / 5):
                         pygame.draw.line(map, (255, 0, 0), (self.x, self.y), (obstacle.x, obstacle.y))
-                        self.sensor[4] = 1 * (65 - dist_to_wall)
+                        self.sensor[4] = 1 * 1 / max(1, dist_to_wall)
 
                     else:
                         pygame.draw.line(map, (255, 0, 0), (self.x, self.y), (obstacle.x, obstacle.y))
-                        self.sensor[5] = 1 * (65 - dist_to_wall)
+                        self.sensor[5] = 1 * 1 / max(1, dist_to_wall)
 
-    def get_reward(self):
+    def get_reward(self, time):
 
         for i in range(1, len(self.ls_x)):
             # Take the line integral
@@ -362,45 +526,37 @@ class Robot:
             delta_r = np.sqrt(delta_x ** 2 + delta_y ** 2)
             self.dist_travelled += delta_r
 
-            if self.omega >= 0.001 * math.pi:
+            if self.omega >= 0.0001 * math.pi:
                 self.flip += 1
 
-        tot_v = sum(self.ls_tot_speed)
         self.avg_dist = math.sqrt((self.init_pos[0] - self.x) ** 2 + (self.init_pos[1] - self.y) ** 2)
+        avg_vel = self.avg_dist / time
 
-        reward = self.dist_travelled * 0 + self.avg_dist * 5 - self.collision * 0 - self.flip * 0 - tot_v
+        score = self.dist_travelled * 1 + self.avg_dist * 3 + avg_vel * 1.5 \
+                - self.collision * 2 - self.flip * 2 - self.stuck * 2 \
+                + self.reward * 10
+        fitness = score / (
+                self.dist_travelled + self.avg_dist + avg_vel + self.collision + self.flip + self.stuck + self.reward)
 
-        return reward
+        return float(fitness)
 
 
 class GeneticAlgorithm:
 
     def __init__(self, n_robots, n_iter, cross_rate, mut_rate):
 
-        self.dims = (1400, 1000)
-        self.env = Envir(self.dims)
-        self.wall = Walls(20, self.dims)
         self.n_robots = n_robots
-
-        self.pop = self.get_init_pop(self.n_robots)
+        self.n_iter = n_iter
+        self.scores = list()
+        self.best_eval = 0
+        self.pop = get_init_pop(self.n_robots)
+        self.best = self.pop[0]
 
         self.gen = 0
-
-        self.black = (0, 0, 0)
-        self.white = (255, 255, 255)
-        self.green = (0, 255, 0)
-        self.red = (255, 0, 0)
-        self.blue = (0, 0, 255)
-        self.yellow = (255, 255, 0)
 
         self.cross_rate = cross_rate
         self.mut_rate = mut_rate
         self.clone = False
-
-        self.font = pygame.font.Font('freesansbold.ttf', 50)
-        self.text = self.font.render('default', True, self.white, self.black)
-        self.textRect = self.text.get_rect()
-        self.textRect.center = (self.dims[0] - 600, self.dims[1] - 100)
 
         self.ls_robots = list()
         self.ls_rewards = list()
@@ -416,11 +572,6 @@ class GeneticAlgorithm:
         self.rel_dist_gen = list()
         self.flips_gen = list()
 
-        self.best = self.pop[0]
-        self.best_eval = 0
-
-        self.n_iter = n_iter
-
     def selection(self):  # k=5
         '''
         Using a tournement style method, we obtain the best
@@ -431,12 +582,12 @@ class GeneticAlgorithm:
         :return:
         '''
 
-        best_index = np.argsort(np.array(self.ls_rewards))[-math.floor(self.n_robots * 0.20):]
+        index = min(-1, -math.floor(self.n_robots * 0.20))  # take best 20%
+        best_index = np.argsort(np.array(self.scores))[index:]
         best_pop = [self.pop[i] for i in best_index]
-        other_index = np.argsort(np.array(self.ls_rewards))[:-math.floor(self.n_robots * 0.20)]
+        other_index = np.argsort(np.array(self.scores))[:index]
 
         other_pop = [self.pop[i] for i in other_index]
-
 
         # selection_ix = np.random.randint(len(self.pop))
         # for ix in np.random.randint(0, len(self.pop), k - 1):
@@ -508,19 +659,6 @@ class GeneticAlgorithm:
 
         return [child1, child2]
 
-    def get_init_pop(self, n_robots):
-
-        population = list()
-        for i in range(0, n_robots):
-            population.append(np.random.randint(low=-255, high=255, size=(7, 2)))
-        return population
-
-    def write_info(self):
-
-        txt = f"Generation = {self.gen}"
-        self.text = self.font.render(txt, True, self.red, self.black)
-        self.env.map.blit(self.text, self.textRect)
-
     def main(self, sim_time):
 
         # Construct initial population, make sure to figure out how to make this
@@ -528,21 +666,18 @@ class GeneticAlgorithm:
 
         print('GENERATION 0')
 
-        self.run_simulation(sim_time)
-
-        init_scores = self.ls_rewards
-
-        self.best_eval = init_scores[0]
+        self.scores = run_simulation(sim_time, self.pop, self.n_robots)
+        self.best_eval = self.scores[0]
 
         for gen in range(self.n_iter):
             self.gen += 1
             print(f'GENERATION: {gen + 1}')
-            self.run_simulation(sim_time)
+            self.scores = run_simulation(sim_time, self.pop, self.n_robots)
 
             for i in range(self.n_robots):
-                if self.ls_rewards[i] > self.best_eval:
-                    self.best, self.best_eval = self.pop[i], self.ls_rewards[i]
-                    print(f'Generation {gen + 1} gives a new best with score {self.ls_rewards[i]}')
+                if self.scores[i] > self.best_eval:
+                    self.best, self.best_eval = self.pop[i], self.scores[i]
+                    print(f'Generation {gen + 1} gives a new best with score {self.scores[i]}')
             # selected = [self.selection() for _ in range(self.n_robots)]
             ls_p1, ls_p2 = self.selection()
 
@@ -550,19 +685,17 @@ class GeneticAlgorithm:
             mating = True
             while mating:
 
-                if len(children) >= self.n_robots:
-                    mating = False
-                #print(len(children))
-                #print(self.n_robots)
-
-                random_parent1 = np.random.randint(0,len(ls_p1))
-                random_parent2 = np.random.randint(0, len(ls_p2))
-                # print(parent1)
-                # print(ls_p2)
-                # print(len(ls_p2))
-
+                random_parent1 = np.random.randint(0, len(ls_p1))
                 parent1 = ls_p1[random_parent1]
-                parent2 = ls_p2[random_parent2]
+                flip = np.random.uniform(0, 1)
+
+                if flip > 0.4:
+                    random_parent2 = np.random.randint(0, len(ls_p1))
+                    parent2 = ls_p1[random_parent2]
+                else:
+                    random_parent2 = np.random.randint(0, len(ls_p2))
+                    parent2 = ls_p2[random_parent2]
+
                 for c in self.crossover(parent1, parent2):
 
                     if not self.clone:
@@ -571,6 +704,8 @@ class GeneticAlgorithm:
                     else:
                         children.append(c)
 
+                if len(children) >= self.n_robots:
+                    mating = False
 
             # for i in range(0, self.n_robots, 2):
             #     p1, p2 = selected[i], selected[i + 1]
@@ -581,74 +716,9 @@ class GeneticAlgorithm:
             #             children.append(c)
             #         else:
             #             children.append(c)
-
             self.pop = children
 
-        return
-
-    def run_simulation(self, time):
-
-        self.ls_rewards = list()
-        self.ls_robots = list()
-
-        # Initialize the robot
-        start = (300, 200)
-        img_path = "/Users/anishjadoenathmisier/Documents/GitHub/BioInspiredIntelligence/robot.png"
-
-        for i in range(self.n_robots):
-
-            self.ls_robots.append(Robot(start, img_path, 20, self.pop[i]))
-
-        self.env.map.fill((255, 255, 255))
-
-        dt = 0
-        lasttime = pygame.time.get_ticks()
-        # Simulation loop
-        while pygame.time.get_ticks() <= time:
-
-            for robot in self.ls_robots:
-                robot.get_collision(self.wall.obstacles)
-                robot.get_sensor(self.wall.obstacles, self.env.map)
-
-            for event in pygame.event.get():
-
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-
-                for robot in self.ls_robots:
-                    robot.move(self.env.height, self.env.width, dt, event, auto=True)
-
-            dt = (pygame.time.get_ticks() - lasttime) / 1000
-            lasttime = pygame.time.get_ticks()
-
-            for robot in self.ls_robots:
-                robot.move(self.env.height, self.env.width, dt, auto=True)
-
-            pygame.display.update()
-
-            self.env.map.fill((255, 255, 255))
-            self.wall.draw(self.env.map)
-
-            for robot in self.ls_robots:
-                robot.draw(self.env.map)
-
-            self.write_info()
-
-        for robot in self.ls_robots:
-            self.ls_rewards.append(robot.get_reward())
-
-        for robot in self.ls_robots:
-            self.tot_avg.append(robot.avg_dist)
-            self.tot_abs_dist.append(robot.dist_travelled)
-            self.tot_coll.append(robot.collision)
-            self.tot_reward.append(robot.get_reward())
-            self.tot_flips.append(robot.flip)
-
-        self.reward_gen.append(np.mean(self.tot_reward))
-        self.coll_gen.append(np.mean(self.tot_coll))
-        self.dist_gen.append(np.mean(self.tot_abs_dist))
-        self.rel_dist_gen.append(np.mean(self.tot_avg))
-        self.flips_gen.append(np.mean(self.tot_flips))
+        return self.best, self.best_eval
 
     def get_results(self, result):
 
@@ -664,7 +734,40 @@ class GeneticAlgorithm:
         if result == 'flip':
             result = self.flips_gen
 
+        if result == 'coll':
+            result = self.coll_gen
+
         return result
 
     def best_gen(self):
         return self.best
+
+
+epochs = 10
+GA = GeneticAlgorithm(n_robots=2 * 10, n_iter=epochs, cross_rate=0.95,
+                      mut_rate=1 / 18)  # n_robots should be an equal number for crossover to work
+
+best, best_eval = GA.main(30000)
+
+x = range(0, epochs + 1)
+plt.figure()
+plt.title('FITNESS')
+plt.grid()
+plt.plot(x, GA.get_results('fitness'))
+
+plt.figure()
+plt.title('TOT DIST')
+plt.grid()
+plt.plot(x, GA.get_results('tot_dist'))
+
+plt.figure()
+plt.title('TOT COLL')
+plt.grid()
+plt.plot(x, GA.get_results('coll'))
+
+plt.figure()
+plt.title('REL DIST')
+plt.grid()
+plt.plot(x, GA.get_results('rel_dist'))
+
+print(best, best_eval)
