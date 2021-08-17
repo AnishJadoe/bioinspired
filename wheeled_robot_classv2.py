@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # Initialize the robot
 start = (300, 200)
 img_path = "/Users/anishjadoenathmisier/Documents/GitHub/BioInspiredIntelligence/robot.png"
-clock = pygame.time.Clock()
+
 np.random.RandomState()
 
 
@@ -15,7 +15,7 @@ np.random.RandomState()
 def get_init_pop(n_robots):
     population = list()
     for i in range(0, n_robots):
-        population.append(np.random.randint(low=-255, high=255, size=(9, 2)))
+        population.append(np.random.randint(low=-255, high=255, size=(10, 2)))
     return population
 
 
@@ -39,8 +39,8 @@ def run_simulation(time, pop, n_robots):
 
     global start
     global img_path
-    global clock
 
+    clock = pygame.time.Clock()
     ls_robots = list()
     scores = list()
 
@@ -58,17 +58,18 @@ def run_simulation(time, pop, n_robots):
     # Obtain the walls
     wall = Walls(20, dims)
 
+
     draw = Draw(dims)
 
     for i in range(n_robots):
-        ls_robots.append(Robot(start, img_path, 20, pop[i]))
+        ls_robots.append(Robot(start, img_path, 15, pop[i]))
 
     dt = 0
     lasttime = pygame.time.get_ticks()
     # Simulation loop
     while pygame.time.get_ticks() <= time:
-        # clock.tick(120)
-
+        clock.tick(120)
+        
         for event in pygame.event.get():
 
             if event.type == pygame.KEYDOWN:
@@ -85,9 +86,11 @@ def run_simulation(time, pop, n_robots):
         dt = (pygame.time.get_ticks() - lasttime) / 1000
         lasttime = pygame.time.get_ticks()
 
-        pygame.display.update()
+       
+
+        wall.get_rewards()
         environment.map.fill((255, 255, 255))
-        wall.draw(environment.map,ls_robots)
+        wall.draw(environment.map, ls_robots)
 
         for robot in ls_robots:
             robot.get_sensor(wall.obstacles, environment.map)
@@ -99,6 +102,8 @@ def run_simulation(time, pop, n_robots):
 
         draw.write_info(gen=GA.gen, time=pygame.time.get_ticks() / 1000, map=environment.map)
 
+        pygame.display.update()
+       
     pygame.quit()
 
     for robot in ls_robots:
@@ -135,7 +140,7 @@ class Walls:  # change name to world
         self.cellMAP = self.get_maze_map()
         self.grid = self.get_grid()
         self.obstacles = self.get_obs()
-        self.rewards = self.get_rewards()
+        self.rewards = list()
 
     def get_maze_map(self):
 
@@ -146,7 +151,7 @@ class Walls:  # change name to world
         cellMAP = np.random.choice([1, 0], size=(int(self.height / self.size), int(self.width / self.size)),
                                    p=[0.80, 0.20])
 
-        generations = 1
+        generations = 2
         GRIDHEIGHT = int(self.height / self.size)
         GRIDWIDTH = int(self.width / self.size)
 
@@ -224,7 +229,6 @@ class Walls:  # change name to world
     def get_rewards(self):
 
         ls_coors = []
-        ls_rewards = []
 
         for index in range(0, len(self.grid)):
             if self.cellMAP.flatten()[index] == 1:
@@ -232,9 +236,8 @@ class Walls:  # change name to world
 
         for i in range(0, self.amount_rewards):
             reward_idx = np.random.randint(low=0, high=len(ls_coors))
-            ls_rewards.append(ls_coors[reward_idx])
-
-        return ls_rewards
+            if len(self.rewards) < 20:
+                self.rewards.append(ls_coors[reward_idx])
 
     def draw(self, map, robots):
 
@@ -247,8 +250,7 @@ class Walls:  # change name to world
             for robot in robots:
                 if reward.colliderect(robot.rect):
                     self.rewards.pop(self.rewards.index(reward))
-
-
+                    break
 
 
 class Envir:
@@ -302,15 +304,15 @@ class Robot:
     def __init__(self, startpos, robot_img, width, chromosome):
 
         self.m2p = 3779.52  # meters 2 pixels
-        self.w = width  * 10
+        self.w = width * 10
         self.init_pos = startpos
         self.x = startpos[0]
         self.y = startpos[1]
         self.theta = 0
-        self.vl = 0.01
-        self.vr = 0.01
-        self.maxspeed = 0.05 * self.m2p
-        self.minspeed = -0.05 * self.m2p
+        self.vl = 1
+        self.vr = 1
+        self.maxspeed = 0.01 * self.m2p
+        self.minspeed = -0.01 * self.m2p
 
         self.ls_tot_speed = list()
 
@@ -330,8 +332,6 @@ class Robot:
         self.length = width
         self.collision = 0
         self.reward = 0
-
-
 
         self.img = pygame.image.load(robot_img)
         self.img = pygame.transform.scale(self.img, (self.width, self.length))
@@ -373,19 +373,21 @@ class Robot:
 
         if auto:
 
-            states = np.zeros(shape=(1, 9), dtype=object)
-            states[:, 0:-3] = self.sensor
+            states = np.zeros(shape=(1, 10), dtype=object)
+            states[:, 0:-4] = self.sensor
             # Give the robot its own state as input
-            states[:, -3] = self.theta
+            states[:, -4] = self.theta
+            states[:, -3] = self.omega
             states[:, -2] = self.vl
             states[:, -1] = self.vl
+
             actions = np.dot(states, self.chromosome)
 
             # Instead of having 2 options, the robot now has 4
             # such that it is also able to brake
 
-            self.vl += actions[:, 0] * 0.01
-            self.vr += actions[:, 1] * 0.01
+            self.vl += actions[:, 0] * 0.015
+            self.vr += actions[:, 1] * 0.015
 
         else:
             if event is not None:
@@ -403,57 +405,32 @@ class Robot:
                     elif event.key == 56:  # 0 is decelerate right
                         self.vr -= 0.01 * self.m2p
 
-        if self.sensor[0]:
-            # self.x = self.init_pos[0]
-            # self.y = self.init_pos[1]
-            # self.vr = 0.01*self.m2p
-            # self.vl = 0.01*self.m2p
-
-            self.vr = -self.vr * 0.8
-            self.vl = -self.vl * 0.8
-
-            #
-            # if 0.5 * math.pi > abs(self.theta) >= 0:
-            #     # print('top right')
-            #     # self.x = self.x - 0.05
-            #     # self.y = self.y - 0.05
-            #     self.x = self.ls_x[-1]
-            #     self.y = self.ls_y[-1]
-            #
-            # if 1 * math.pi > abs(self.theta) >= 0.5 * math.pi:
-            #     # print('top left')
-            #     # self.x = self.x + 0.05
-            #     # self.y = self.y + 0.05
-            #     self.x = self.ls_x[-1]
-            #     self.y = self.ls_y[-1]
-            #
-            # if 1.5 * math.pi > abs(self.theta) >= 1 * math.pi:
-            #     # print('bottom left')
-            #     # self.x = self.x + 0.05
-            #     # self.y = self.y - 0.05
-            #     self.x = self.ls_x[-1]
-            #     self.y = self.ls_y[-1]
-            #
-            # else:
-            #     # print('bottom right')
-            #     # self.x = self.x - 0.05
-            #     # self.y = self.y + 0.05
-            #     self.x = self.ls_x[-1]
-            #     self.y = self.ls_y[-1]
-        else:
-
-            self.x += ((self.vl + self.vr) / 2) * math.cos(self.theta) * dt
-            self.y -= ((self.vl + self.vr) / 2) * math.sin(self.theta) * dt
+                # check to see if the rotational velocity of the robot is not exceding 
+        # the maximum rotational velocity 
 
         self.omega = (self.vr - self.vl) / self.w
 
         if self.omega >= 0.02 * math.pi:
+            self.flip += 1
             self.omega = 0.02 * math.pi
 
         self.theta += self.omega * dt
 
         if self.theta > 2 * math.pi or self.theta < -2 * math.pi:
             self.theta = 0
+
+        if self.sensor[0]:
+
+            self.x += (-0.1 * (self.vr + self.vl) * 0.5 * math.cos(self.theta) * dt)[0]
+            self.y -= (-0.1 * (self.vr + self.vl) * 0.5 * math.sin(self.theta) * dt)[0]
+
+        else:
+
+            self.x += (((self.vl + self.vr) / 2) * math.cos(self.theta) * dt)[0]
+            self.y -= (((self.vl + self.vr) / 2) * math.sin(self.theta) * dt)[0]
+
+
+
 
         # Detects if we're within map borders
 
@@ -526,17 +503,16 @@ class Robot:
             delta_r = np.sqrt(delta_x ** 2 + delta_y ** 2)
             self.dist_travelled += delta_r
 
-            if self.omega >= 0.0001 * math.pi:
-                self.flip += 1
 
         self.avg_dist = math.sqrt((self.init_pos[0] - self.x) ** 2 + (self.init_pos[1] - self.y) ** 2)
         avg_vel = self.avg_dist / time
 
-        score = self.dist_travelled * 1 + self.avg_dist * 3 + avg_vel * 1.5 \
-                - self.collision * 2 - self.flip * 2 - self.stuck * 2 \
-                + self.reward * 10
+        score = self.dist_travelled * 1 + self.avg_dist * 20  \
+                - self.collision * 10  \
+                + self.reward * 50 + avg_vel * 10
+
         fitness = score / (
-                self.dist_travelled + self.avg_dist + avg_vel + self.collision + self.flip + self.stuck + self.reward)
+                self.dist_travelled + self.avg_dist  + self.collision + avg_vel + self.reward)
 
         return float(fitness)
 
@@ -582,7 +558,7 @@ class GeneticAlgorithm:
         :return:
         '''
 
-        index = min(-1, -math.floor(self.n_robots * 0.20))  # take best 20%
+        index = min(-1, -math.floor(self.n_robots * 0.20))  # take best 10%
         best_index = np.argsort(np.array(self.scores))[index:]
         best_pop = [self.pop[i] for i in best_index]
         other_index = np.argsort(np.array(self.scores))[:index]
@@ -743,11 +719,11 @@ class GeneticAlgorithm:
         return self.best
 
 
-epochs = 10
-GA = GeneticAlgorithm(n_robots=2 * 10, n_iter=epochs, cross_rate=0.95,
-                      mut_rate=1 / 18)  # n_robots should be an equal number for crossover to work
+epochs = 25
+GA = GeneticAlgorithm(n_robots=2 * 15, n_iter=epochs, cross_rate=0.8,
+                      mut_rate=1 / 10)  # n_robots should be an equal number for crossover to work
 
-best, best_eval = GA.main(30000)
+best, best_eval = GA.main(60000)
 
 x = range(0, epochs + 1)
 plt.figure()
@@ -770,4 +746,5 @@ plt.title('REL DIST')
 plt.grid()
 plt.plot(x, GA.get_results('rel_dist'))
 
+plt.show()
 print(best, best_eval)
