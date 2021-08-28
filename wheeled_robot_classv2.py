@@ -33,7 +33,7 @@ def calc_angle(coord1, coord2):
 
     return orient
 
-
+# MAIN GAME LOOP
 def run_simulation(time, pop, n_robots):
     pygame.init()
 
@@ -49,6 +49,8 @@ def run_simulation(time, pop, n_robots):
     tot_coll = list()
     tot_reward = list()
     tot_flips = list()
+    tot_token = list()
+   
 
     dims = (1200, 800)
 
@@ -105,8 +107,10 @@ def run_simulation(time, pop, n_robots):
         pygame.display.update()
        
     pygame.quit()
+   
 
     for robot in ls_robots:
+        print(robot.reward)
         scores.append(robot.get_reward(time))
 
     for robot in ls_robots:
@@ -115,11 +119,15 @@ def run_simulation(time, pop, n_robots):
         tot_coll.append(robot.collision)
         tot_reward.append(robot.get_reward(time))
         tot_flips.append(robot.flip)
+        tot_token.append(robot.reward)
+     
 
     GA.reward_gen.append(np.mean(tot_reward))
     GA.dist_gen.append(np.mean(tot_abs_dist))
     GA.rel_dist_gen.append(np.mean(tot_avg))
     GA.coll_gen.append(np.mean(tot_coll))
+    GA.token_gen.append(np.mean(tot_token))
+
 
     return scores
 
@@ -294,7 +302,7 @@ class Draw:
         self.trail_set = []
 
     def write_info(self, map, gen, time):
-        txt = f"Generation: {gen}, Time: {time}"
+        txt = (f"Generation: {gen}, Time: {time}")
         self.text = self.font.render(txt, True, self.white, self.black)
         map.blit(self.text, self.textRect)
 
@@ -379,15 +387,15 @@ class Robot:
             states[:, -4] = self.theta
             states[:, -3] = self.omega
             states[:, -2] = self.vl
-            states[:, -1] = self.vl
+            states[:, -1] = self.vr
 
-            actions = np.dot(states, self.chromosome)
+            actions = np.dot(self.chromosome.T ,states.T)
 
             # Instead of having 2 options, the robot now has 4
             # such that it is also able to brake
 
-            self.vl += actions[:, 0] * 0.015
-            self.vr += actions[:, 1] * 0.015
+            self.vl += actions[0] * 0.015
+            self.vr += actions[1] * 0.015
 
         else:
             if event is not None:
@@ -420,7 +428,8 @@ class Robot:
             self.theta = 0
 
         if self.sensor[0]:
-
+            # Whenever there is a collision we move in the opposite direction
+            # but also dissipate some energy, hence the -0.1
             self.x += (-0.1 * (self.vr + self.vl) * 0.5 * math.cos(self.theta) * dt)[0]
             self.y -= (-0.1 * (self.vr + self.vl) * 0.5 * math.sin(self.theta) * dt)[0]
 
@@ -505,14 +514,14 @@ class Robot:
 
 
         self.avg_dist = math.sqrt((self.init_pos[0] - self.x) ** 2 + (self.init_pos[1] - self.y) ** 2)
-        avg_vel = self.avg_dist / time
+        
 
-        score = self.dist_travelled * 1 + self.avg_dist * 20  \
-                - self.collision * 10  \
-                + self.reward * 50 + avg_vel * 10
+        score = self.dist_travelled * 0.5 + self.avg_dist * 2  \
+                - self.collision * 1.5  \
+                + self.reward * 5 
 
         fitness = score / (
-                self.dist_travelled + self.avg_dist  + self.collision + avg_vel + self.reward)
+                self.dist_travelled + self.avg_dist  + self.collision + self.reward)
 
         return float(fitness)
 
@@ -534,19 +543,13 @@ class GeneticAlgorithm:
         self.mut_rate = mut_rate
         self.clone = False
 
-        self.ls_robots = list()
-        self.ls_rewards = list()
-        self.tot_abs_dist = list()
-        self.tot_avg = list()
-        self.tot_coll = list()
-        self.tot_reward = list()
-        self.tot_flips = list()
-
         self.reward_gen = list()
         self.coll_gen = list()
         self.dist_gen = list()
         self.rel_dist_gen = list()
         self.flips_gen = list()
+        self.token_gen = list()
+   
 
     def selection(self):  # k=5
         '''
@@ -713,19 +716,23 @@ class GeneticAlgorithm:
         if result == 'coll':
             result = self.coll_gen
 
+        if result == 'token':
+            result = self.token_gen
+
         return result
 
     def best_gen(self):
         return self.best
 
 
-epochs = 25
+epochs = 20
 GA = GeneticAlgorithm(n_robots=2 * 15, n_iter=epochs, cross_rate=0.8,
-                      mut_rate=1 / 10)  # n_robots should be an equal number for crossover to work
+                      mut_rate=1 / 5)  # n_robots should be an equal number for crossover to work
 
 best, best_eval = GA.main(60000)
 
 x = range(0, epochs + 1)
+
 plt.figure()
 plt.title('FITNESS')
 plt.grid()
@@ -745,6 +752,14 @@ plt.figure()
 plt.title('REL DIST')
 plt.grid()
 plt.plot(x, GA.get_results('rel_dist'))
+
+plt.figure()
+plt.title('TOKEN')
+plt.grid()
+plt.plot(x, GA.get_results('token'))
+
+
+
 
 plt.show()
 print(best, best_eval)
