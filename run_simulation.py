@@ -1,21 +1,25 @@
-
 from walls import Walls
 from robot import Robot
 from environment import Envir
 from draw import Draw
 import pygame
-import matplotlib.pyplot as plt
 import numpy as np
-
+import os
 
 # Initialize the robot
 start = (300, 200)
-img_path = "/Users/anishjadoenathmisier/Documents/GitHub/BioInspiredIntelligence/robot.png"
+
+script_dir = os.path.dirname(__file__)
+rel_path = "../bioinspired/robot.png"
+img_path = os.path.join(script_dir, rel_path)
+print(img_path)
 
 np.random.RandomState()
 
 # MAIN GAME LOOP
-def run_simulation(time, pop, n_robots,GA):
+
+
+def run_simulation(time, pop, n_robots, GA):
     pygame.init()
 
     global start
@@ -31,7 +35,6 @@ def run_simulation(time, pop, n_robots,GA):
     tot_reward = list()
     tot_flips = list()
     tot_token = list()
-   
 
     dims = (1200, 800)
 
@@ -40,7 +43,6 @@ def run_simulation(time, pop, n_robots,GA):
 
     # Obtain the walls
     wall = Walls(20, dims)
-
 
     draw = Draw(dims)
 
@@ -52,7 +54,7 @@ def run_simulation(time, pop, n_robots,GA):
     # Simulation loop
     while pygame.time.get_ticks() <= time:
         clock.tick(120)
-        
+
         for event in pygame.event.get():
 
             if event.type == pygame.KEYDOWN:
@@ -64,12 +66,14 @@ def run_simulation(time, pop, n_robots,GA):
                 pygame.quit()
 
             for robot in ls_robots:
-                robot.move(environment.height, environment.width, dt, event, auto=True)
+                robot.move(environment.height,
+                           environment.width,
+                           dt,
+                           event,
+                           auto=True)
 
         dt = (pygame.time.get_ticks() - lasttime) / 1000
         lasttime = pygame.time.get_ticks()
-
-       
 
         wall.get_rewards()
         environment.map.fill((255, 255, 255))
@@ -83,12 +87,13 @@ def run_simulation(time, pop, n_robots,GA):
 
             robot.draw(environment.map)
 
-        draw.write_info(gen=GA.gen, time=pygame.time.get_ticks() / 1000, map=environment.map)
+        draw.write_info(gen=GA.gen,
+                        time=pygame.time.get_ticks() / 1000,
+                        map=environment.map)
 
         pygame.display.update()
-       
+
     pygame.quit()
-   
 
     for robot in ls_robots:
         print(robot.reward)
@@ -101,13 +106,11 @@ def run_simulation(time, pop, n_robots,GA):
         tot_reward.append(robot.get_reward(time))
         tot_flips.append(robot.flip)
         tot_token.append(robot.reward)
-     
 
     GA.reward_gen.append(np.mean(tot_reward))
     GA.dist_gen.append(np.mean(tot_abs_dist))
     GA.rel_dist_gen.append(np.mean(tot_avg))
     GA.coll_gen.append(np.mean(tot_coll))
     GA.token_gen.append(np.mean(tot_token))
-
 
     return scores

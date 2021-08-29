@@ -1,9 +1,10 @@
 from functions import get_init_pop
 from run_simulation import run_simulation
+import math
+import numpy as np
 
 
 class GeneticAlgorithm:
-    
     def __init__(self, n_robots, n_iter, cross_rate, mut_rate):
 
         self.n_robots = n_robots
@@ -25,17 +26,16 @@ class GeneticAlgorithm:
         self.rel_dist_gen = list()
         self.flips_gen = list()
         self.token_gen = list()
-   
 
     def selection(self):  # k=5
-        '''
+        """
         Using a tournement style method, we obtain the best
         agent in that population.
         :param pop:
         :param scores:
         :param k:
         :return:
-        '''
+        """
 
         index = min(-1, -math.floor(self.n_robots * 0.20))  # take best 10%
         best_index = np.argsort(np.array(self.scores))[index:]
@@ -67,7 +67,9 @@ class GeneticAlgorithm:
                 random_row_e = np.random.randint(low=0, high=individual.shape[0])
                 random_column_e = np.random.randint(low=0, high=individual.shape[1])
 
-                if (random_row_s != random_row_e) or (random_column_s != random_column_e):
+                if (random_row_s != random_row_e) or (
+                    random_column_s != random_column_e
+                ):
                     unequal = False
 
             p_start = individual[random_row_s, random_column_s]
@@ -119,20 +121,22 @@ class GeneticAlgorithm:
         # Construct initial population, make sure to figure out how to make this
         # flow more logically
 
-        print('GENERATION 0')
+        print("GENERATION 0")
 
         self.scores = run_simulation(sim_time, self.pop, self.n_robots, self)
         self.best_eval = self.scores[0]
 
         for gen in range(self.n_iter):
             self.gen += 1
-            print(f'GENERATION: {gen + 1}')
+            print(f"GENERATION: {gen + 1}")
             self.scores = run_simulation(sim_time, self.pop, self.n_robots, self)
 
             for i in range(self.n_robots):
                 if self.scores[i] > self.best_eval:
                     self.best, self.best_eval = self.pop[i], self.scores[i]
-                    print(f'Generation {gen + 1} gives a new best with score {self.scores[i]}')
+                    print(
+                        f"Generation {gen + 1} gives a new best with score {self.scores[i]}"
+                    )
             # selected = [self.selection() for _ in range(self.n_robots)]
             ls_p1, ls_p2 = self.selection()
 
@@ -177,22 +181,22 @@ class GeneticAlgorithm:
 
     def get_results(self, result):
 
-        if result == 'fitness':
+        if result == "fitness":
             result = self.reward_gen
 
-        if result == 'tot_dist':
+        if result == "tot_dist":
             result = self.dist_gen
 
-        if result == 'rel_dist':
+        if result == "rel_dist":
             result = self.rel_dist_gen
 
-        if result == 'flip':
+        if result == "flip":
             result = self.flips_gen
 
-        if result == 'coll':
+        if result == "coll":
             result = self.coll_gen
 
-        if result == 'token':
+        if result == "token":
             result = self.token_gen
 
         return result
