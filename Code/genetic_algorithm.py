@@ -5,7 +5,20 @@ import numpy as np
 
 
 class GeneticAlgorithm:
+    """This class does all the work that is needed for a genetic algorithm,
+    there is a mutation, crossover and selection operator available for which all the 
+    parameters can be changed as needed 
+    """
+
     def __init__(self, n_robots, n_iter, cross_rate, mut_rate):
+        """Initialization of the class 
+
+        Args:
+            n_robots (int): The amount of robots in the population
+            n_iter (int): The amount of epochs that the simulation will run for
+            cross_rate (float): The crossover rate of the crossover operator 
+            mut_rate (float): The mutation rate of the mutation operator 
+        """
 
         self.n_robots = n_robots
         self.n_iter = n_iter
@@ -28,13 +41,12 @@ class GeneticAlgorithm:
         self.token_gen = list()
 
     def selection(self):  # k=5
-        """
-        Using a tournement style method, we obtain the best
-        agent in that population.
-        :param pop:
-        :param scores:
-        :param k:
-        :return:
+        """The selection operator used for this algorithm, it takes the best 20%
+        of the generation and seperates it from the bottom 80%
+
+        Returns:
+            best_pop (list): The top 20% of the population
+            other_pop (list): The bottom 80% of the population 
         """
 
         index = min(-1, -math.floor(self.n_robots * 0.20))  # take best 10%
@@ -52,6 +64,12 @@ class GeneticAlgorithm:
         return best_pop, other_pop
 
     def mutation(self, individual):
+        """This is the mutation operator of the genetic algorithm, it takes an
+        indivual and swaps 2 loci on the chromosome matrix 
+
+        Args:
+            individual (numpy array): The individual on which the mutation will be preformed 
+        """
         random_choice = np.random.sample()
 
         if random_choice > self.mut_rate:
@@ -63,14 +81,15 @@ class GeneticAlgorithm:
                 random_row_s = np.random.randint(low=0, high=individual.shape[0])
                 random_column_s = np.random.randint(low=0, high=individual.shape[1])
 
-                # Row and column to be swapped
+                # Row and column with which we want to swap the orginal data point with 
                 random_row_e = np.random.randint(low=0, high=individual.shape[0])
                 random_column_e = np.random.randint(low=0, high=individual.shape[1])
 
                 if (random_row_s != random_row_e) or (
                     random_column_s != random_column_e
                 ):
-                    unequal = False
+                    # only if the rows or column are not the same we will swap the data points 
+                    unequal = False 
 
             p_start = individual[random_row_s, random_column_s]
             p_end = individual[random_row_e, random_column_e]
@@ -81,6 +100,17 @@ class GeneticAlgorithm:
         return
 
     def crossover(self, parent1, parent2):
+        """The crossover operator of the algorithm, it takes 2 parent chromosomes and 
+        uses either a horizontal (row) or vertical (column) method  for crossover 
+
+        Args:
+            parent1 (numpy array): The first parent used for crossover 
+            parent2 (numpy array): The second parent used for crossover 
+
+        Returns:
+            [child1, child2] (list): A list containing both the first and second child
+            obtained after crossover 
+        """
 
         random_choice = np.random.sample()
         random_row = np.random.randint(low=1, high=parent1.shape[0])
@@ -117,25 +147,26 @@ class GeneticAlgorithm:
         return [child1, child2]
 
     def main(self, sim_time):
+        """This is the main loop for the algorithm. First a base score is set-up by running the algorithm with the inital population
 
-        # Construct initial population, make sure to figure out how to make this
-        # flow more logically
+        Args:
+            sim_time ([type]): [description]
 
-        print("GENERATION 0")
-
-        self.scores = run_simulation(sim_time, self.pop, self.n_robots, self)
-        self.best_eval = self.scores[0]
+        Returns:
+            [type]: [description]
+        """
 
         for gen in range(self.n_iter):
-            self.gen += 1
-            print(f"GENERATION: {gen + 1}")
+            
+            print(f"GENERATION: {gen}")
             self.scores = run_simulation(sim_time, self.pop, self.n_robots, self)
-
+            self.best_eval = self.scores[0]
+            
             for i in range(self.n_robots):
                 if self.scores[i] > self.best_eval:
                     self.best, self.best_eval = self.pop[i], self.scores[i]
                     print(
-                        f"Generation {gen + 1} gives a new best with score {self.scores[i]}"
+                        f"Generation {gen} gives a new best with score {self.scores[i]}"
                     )
             # selected = [self.selection() for _ in range(self.n_robots)]
             ls_p1, ls_p2 = self.selection()
@@ -168,14 +199,16 @@ class GeneticAlgorithm:
 
             # for i in range(0, self.n_robots, 2):
             #     p1, p2 = selected[i], selected[i + 1]
-            #
+            
             #     for c in self.crossover(p1, p2):
             #         if not self.clone:
             #             self.mutation(c)
             #             children.append(c)
             #         else:
             #             children.append(c)
+
             self.pop = children
+            self.gen += 1
 
         return self.best, self.best_eval
 

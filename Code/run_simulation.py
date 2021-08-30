@@ -10,9 +10,8 @@ import os
 start = (300, 200)
 
 script_dir = os.path.dirname(__file__)
-rel_path = "../bioinspired/robot.png"
+rel_path = "../Images/robot.png"
 img_path = os.path.join(script_dir, rel_path)
-print(img_path)
 
 np.random.RandomState()
 
@@ -20,6 +19,18 @@ np.random.RandomState()
 
 
 def run_simulation(time, pop, n_robots, GA):
+    """This is the main game loop of the algorithm, it is called by the Genetic Algorithm class in 
+    the main loop. It yields the scores of the corresponding individual chromosomes and saves the result of each run to the genetic algorithm class 
+
+    Args:
+        time (int): The runtime of each epoch
+        pop (numpy array): All the individual robots part of this generation
+        n_robots (int): The amount of robots to be used in the algorithm
+        GA (Genetic Algorithm class): This is the class that contains all the genetic algorithm functions 
+
+    Returns:
+        scores (float)]: The scores given to each individual 
+    """
     pygame.init()
 
     global start
@@ -75,12 +86,12 @@ def run_simulation(time, pop, n_robots, GA):
         dt = (pygame.time.get_ticks() - lasttime) / 1000
         lasttime = pygame.time.get_ticks()
 
-        wall.get_rewards()
+        wall.get_rewards() # Populate the world with rewards 
         environment.map.fill((255, 255, 255))
         wall.draw(environment.map, ls_robots)
 
         for robot in ls_robots:
-            robot.get_sensor(wall.obstacles, environment.map)
+            robot.get_sensor(wall.obstacles, environment.map) 
             if sum(robot.sensor[1:]) > 0:
                 robot.get_collision(wall.obstacles)
             robot.move(environment.height, environment.width, dt, auto=True)
@@ -96,7 +107,6 @@ def run_simulation(time, pop, n_robots, GA):
     pygame.quit()
 
     for robot in ls_robots:
-        print(robot.reward)
         scores.append(robot.get_reward(time))
 
     for robot in ls_robots:

@@ -1,7 +1,11 @@
 import numpy as np
 import pygame
 
+
 class Draw:
+    
+    """ Class used for drawing
+    """    
     
     def __init__(self, dimensions):
         # colors
@@ -15,8 +19,7 @@ class Draw:
         self.font = pygame.font.Font('freesansbold.ttf', 50)
         self.text = self.font.render('default', True, self.white, self.black)
         self.textRect = self.text.get_rect()
-        self.textRect.center = (dimensions[0] - 600,
-                                dimensions[1] - 100)
+        self.textRect.center = (dimensions[0] - 600, dimensions[1] - 100)
         self.trail_set = []
 
     def write_info(self, map, gen, time):

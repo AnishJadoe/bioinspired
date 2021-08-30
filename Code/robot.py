@@ -53,18 +53,29 @@ class Robot:
         self.chromosome = chromosome
 
     def draw(self, world):
+        '''
+        Draws the robot on the world
+        '''
         world.blit(self.rotated, self.rect)
 
     def get_collision(self, obstacles):
+        '''
+        Function to check if we have collided with an obstacle, the sensor
+        value is changed whenever there is a collision
+        '''
 
         self.sensor[0] = 0
 
         for obstacle in obstacles:
             if self.rect.colliderect(obstacle):
-                self.collision += 1
+                self.collision += 1 # this is to keep track of the amount of collisions the robot has made
                 self.sensor[0] = 1
 
     def get_reward(self, rewards):
+        '''
+        Function to check if we have collided with a token, when this happens the
+        robot obtains a reward 
+        '''
 
         for reward in rewards:
             if self.rect.colliderect(reward):
@@ -227,10 +238,11 @@ class Robot:
         )
 
         score = (
-            self.dist_travelled * 0.5
+            self.dist_travelled * 1
             + self.avg_dist * 2
-            - self.collision * 1.5
             + self.reward * 5
+            - self.collision * 0.5
+            
         )
 
         fitness = score / (
