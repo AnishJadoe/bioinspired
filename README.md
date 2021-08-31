@@ -1,7 +1,11 @@
 # Bioinspired Intelligence 
 This is code written for the Bio-Inspired Intelligence course given at the TU Delft. The assignment consisted of developing an evolutionary robotics algorithm for a differential drive robot. The following code consists of an algorithm that generates a map and an algorithm that uses evolutionary principles to develop autonomous control behavior on a robot. 
 
-
+## Dependencies
+To make run the code the user must have the following installed:
+- pygame
+- numpy
+- matplotlib
 ## Code Overview
 - The 'main.py' file runs the complete program and plots the performance of the corresponding setting of the algorithm. 
 - The 'robot.py' file contains all the code that was needed to simulate the robot, this includes the code for the kinematics and of the fitness function
