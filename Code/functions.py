@@ -13,7 +13,11 @@ def get_init_pop(n_robots):
     Returns:
         population (list): The initial population 
     """    
+    np.random.RandomState()
     population = list()
+    np.random.seed(42) # To ensure that the initial population stays the same 
+                       # with differing mutation parameters 
+
     for i in range(0, n_robots):
         population.append(np.random.randint(low=-255, high=255, size=(10, 2)))
     return population

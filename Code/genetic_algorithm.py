@@ -179,10 +179,14 @@ class GeneticAlgorithm:
                 parent1 = ls_p1[random_parent1]
                 flip = np.random.uniform(0, 1)
 
-                if flip > 0.4:
+                if flip > 0.3:
+                    # Let the parent mate with another parent from the top 20%
+
                     random_parent2 = np.random.randint(0, len(ls_p1))
                     parent2 = ls_p1[random_parent2]
                 else:
+                    # Let the parent mate with a parent from the bottom 80%
+
                     random_parent2 = np.random.randint(0, len(ls_p2))
                     parent2 = ls_p2[random_parent2]
 

@@ -47,7 +47,7 @@ def run_simulation(time, pop, n_robots, GA):
     tot_flips = list()
     tot_token = list()
 
-    dims = (1200, 800)
+    dims = (1400, 800)
 
     environment = Envir(dims)
     environment.map.fill((255, 255, 255))
@@ -86,7 +86,7 @@ def run_simulation(time, pop, n_robots, GA):
         dt = (pygame.time.get_ticks() - lasttime) / 1000
         lasttime = pygame.time.get_ticks()
 
-        wall.get_rewards() # Populate the world with rewards 
+        wall.get_tokens() # Populate the world with rewards 
         environment.map.fill((255, 255, 255))
         wall.draw(environment.map, ls_robots)
 
@@ -107,15 +107,15 @@ def run_simulation(time, pop, n_robots, GA):
     pygame.quit()
 
     for robot in ls_robots:
-        scores.append(robot.get_reward(time))
+        scores.append(robot.get_reward())
 
     for robot in ls_robots:
         tot_avg.append(robot.avg_dist)
         tot_abs_dist.append(robot.dist_travelled)
         tot_coll.append(robot.collision)
-        tot_reward.append(robot.get_reward(time))
+        tot_reward.append(robot.get_reward())
         tot_flips.append(robot.flip)
-        tot_token.append(robot.reward)
+        tot_token.append(robot.token)
 
     GA.reward_gen.append(np.mean(tot_reward))
     GA.dist_gen.append(np.mean(tot_abs_dist))

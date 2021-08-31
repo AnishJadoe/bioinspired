@@ -1,3 +1,3 @@
 import numpy as np
 
-print(np.linspace(0,1,6))
+print(np.logspace(0,5,6))

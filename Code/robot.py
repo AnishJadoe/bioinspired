@@ -43,7 +43,7 @@ class Robot:
         self.width = width
         self.length = width
         self.collision = 0
-        self.reward = 0
+        self.token = 0
 
         self.img = pygame.image.load(robot_img)
         self.img = pygame.transform.scale(self.img, (self.width, self.length))
@@ -68,25 +68,34 @@ class Robot:
 
         for obstacle in obstacles:
             if self.rect.colliderect(obstacle):
-                self.collision += 1 # this is to keep track of the amount of collisions the robot has made
+                self.collision += 1  # this is to keep track of the amount of collisions the robot has made
                 self.sensor[0] = 1
 
-    def get_reward(self, rewards):
+    def get_token(self, tokens):
         '''
         Function to check if we have collided with a token, when this happens the
-        robot obtains a reward 
+        robot obtains a token
         '''
 
-        for reward in rewards:
-            if self.rect.colliderect(reward):
-                self.reward += 1
-                rewards.pop(reward)
+        for token in tokens:
+            if self.rect.colliderect(token):
+                print(self.token)
+                print(self.token)
+                tokens.pop(token)
 
     def move(self, height, width, dt, event=None, auto=False):
 
         self.ls_x.append(self.x)
         self.ls_y.append(self.y)
         self.ls_theta.append(self.theta)
+
+        # Calculating the amount of distance traveled since last time step and adding
+        # this to absolute distance travelled
+        if len(self.ls_x) >= 2:
+            delta_x = float(self.ls_x[-2] - self.ls_x[-1])
+            delta_y = float(self.ls_y[-2] - self.ls_y[-1])
+            delta_r = np.sqrt(delta_x**2 + delta_y**2)
+            self.dist_travelled += delta_r
 
         if self.x == self.ls_x[-1] and self.y == self.ls_y[-1]:
             self.stuck += 1
@@ -127,7 +136,22 @@ class Robot:
                     elif event.key == 56:  # 0 is decelerate right
                         self.vr -= 0.01 * self.m2p
 
-                # check to see if the rotational velocity of the robot is not exceding
+        if self.sensor[0]:
+            # Whenever there is a collision we move in the opposite direction
+            # but also dissipate some energy, hence the -0.1
+            self.x += (-0.1 * (self.vr + self.vl) * 0.5 *
+                       math.cos(self.theta) * dt)[0]
+            self.y -= (-0.1 * (self.vr + self.vl) * 0.5 *
+                       math.sin(self.theta) * dt)[0]
+
+        else:
+
+            self.x += (((self.vl + self.vr) / 2) * math.cos(self.theta) *
+                       dt)[0]
+            self.y -= (((self.vl + self.vr) / 2) * math.sin(self.theta) *
+                       dt)[0]
+
+            # check to see if the rotational velocity of the robot is not exceding
         # the maximum rotational velocity
 
         self.omega = (self.vr - self.vl) / self.w
@@ -140,17 +164,6 @@ class Robot:
 
         if self.theta > 2 * math.pi or self.theta < -2 * math.pi:
             self.theta = 0
-
-        if self.sensor[0]:
-            # Whenever there is a collision we move in the opposite direction
-            # but also dissipate some energy, hence the -0.1
-            self.x += (-0.1 * (self.vr + self.vl) * 0.5 * math.cos(self.theta) * dt)[0]
-            self.y -= (-0.1 * (self.vr + self.vl) * 0.5 * math.sin(self.theta) * dt)[0]
-
-        else:
-
-            self.x += (((self.vl + self.vr) / 2) * math.cos(self.theta) * dt)[0]
-            self.y -= (((self.vl + self.vr) / 2) * math.sin(self.theta) * dt)[0]
 
         # Detects if we're within map borders
 
@@ -174,7 +187,8 @@ class Robot:
         self.vr = min(self.vr, self.maxspeed)
         self.vl = min(self.vl, self.maxspeed)
 
-        self.rotated = pygame.transform.rotozoom(self.img, math.degrees(self.theta), 1)
+        self.rotated = pygame.transform.rotozoom(self.img,
+                                                 math.degrees(self.theta), 1)
         self.rect = self.rotated.get_rect(center=(self.x, self.y))
 
         return
@@ -186,67 +200,49 @@ class Robot:
             self.sensor = [0, 0, 0, 0, 0, 0]
 
             for obstacle in obstacles:
-                dist_to_wall = calc_distance((self.x, self.y), (obstacle.x, obstacle.y))
+                dist_to_wall = calc_distance((self.x, self.y),
+                                             (obstacle.x, obstacle.y))
 
                 if dist_to_wall <= 75:
-                    angle_w_wall = calc_angle(
-                        (self.x, self.y), (obstacle.x, obstacle.y)
-                    )
+                    angle_w_wall = calc_angle((self.x, self.y),
+                                              (obstacle.x, obstacle.y))
 
                     if 0 <= angle_w_wall < (math.pi * 2 * 1 / 5):
-                        pygame.draw.line(
-                            map, (255, 0, 0), (self.x, self.y), (obstacle.x, obstacle.y)
-                        )
+                        pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
+                                         (obstacle.x, obstacle.y))
                         self.sensor[1] = 1 * 1 / max(1, dist_to_wall)
 
-                    elif (math.pi * 2 * 1 / 5) <= angle_w_wall < (math.pi * 2 * 2 / 5):
-                        pygame.draw.line(
-                            map, (255, 0, 0), (self.x, self.y), (obstacle.x, obstacle.y)
-                        )
+                    elif (math.pi * 2 * 1 / 5) <= angle_w_wall < (math.pi * 2 *
+                                                                  2 / 5):
+                        pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
+                                         (obstacle.x, obstacle.y))
                         self.sensor[2] = 1 * 1 / max(1, dist_to_wall)
 
-                    elif (math.pi * 2 * 2 / 5) <= angle_w_wall < (math.pi * 2 * 3 / 5):
-                        pygame.draw.line(
-                            map, (255, 0, 0), (self.x, self.y), (obstacle.x, obstacle.y)
-                        )
+                    elif (math.pi * 2 * 2 / 5) <= angle_w_wall < (math.pi * 2 *
+                                                                  3 / 5):
+                        pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
+                                         (obstacle.x, obstacle.y))
                         self.sensor[3] = 1 * 1 / max(1, dist_to_wall)
 
-                    elif (math.pi * 2 * 3 / 5) <= angle_w_wall < (math.pi * 2 * 4 / 5):
-                        pygame.draw.line(
-                            map, (255, 0, 0), (self.x, self.y), (obstacle.x, obstacle.y)
-                        )
+                    elif (math.pi * 2 * 3 / 5) <= angle_w_wall < (math.pi * 2 *
+                                                                  4 / 5):
+                        pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
+                                         (obstacle.x, obstacle.y))
                         self.sensor[4] = 1 * 1 / max(1, dist_to_wall)
 
                     else:
-                        pygame.draw.line(
-                            map, (255, 0, 0), (self.x, self.y), (obstacle.x, obstacle.y)
-                        )
+                        pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
+                                         (obstacle.x, obstacle.y))
                         self.sensor[5] = 1 * 1 / max(1, dist_to_wall)
 
-    def get_reward(self, time):
+    def get_reward(self):
 
-        for i in range(1, len(self.ls_x)):
-            # Take the line integral
+        self.avg_dist = math.sqrt((self.init_pos[0] - self.x)**2 +
+                                  (self.init_pos[1] - self.y)**2)
 
-            delta_x = float(self.ls_x[i] - self.ls_x[i - 1])
-            delta_y = float(self.ls_y[i] - self.ls_y[i - 1])
-            delta_r = np.sqrt(delta_x ** 2 + delta_y ** 2)
-            self.dist_travelled += delta_r
+        score = (self.token * 50 + self.avg_dist * 1 + self.dist_travelled * 1 - self.collision * 2.5) / (
+            self.token + self.avg_dist + self.dist_travelled + self.collision)
 
-        self.avg_dist = math.sqrt(
-            (self.init_pos[0] - self.x) ** 2 + (self.init_pos[1] - self.y) ** 2
-        )
-
-        score = (
-            self.dist_travelled * 1
-            + self.avg_dist * 2
-            + self.reward * 5
-            - self.collision * 0.5
-            
-        )
-
-        fitness = score / (
-            self.dist_travelled + self.avg_dist + self.collision + self.reward
-        )
+        fitness = score
 
         return float(fitness)
