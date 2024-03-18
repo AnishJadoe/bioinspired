@@ -10,17 +10,20 @@ class Robot:
 
         self.m2p = 3779.52  # meters 2 pixels
         self.w = width * 10
+        
         self.init_pos = startpos
         self.x = startpos[0]
         self.y = startpos[1]
+        self.current_pos = (self.x,self.y)
         self.theta = 0
         self.vl = 1
         self.vr = 1
-        self.maxspeed = 0.01 * self.m2p
-        self.minspeed = -0.01 * self.m2p
+        self.maxspeed = 300
+        self.minspeed = -300
+        self.all_states = np.array(np.meshgrid([0, 1],[0,1],[0,1],[0,1],[0,1])).T.reshape(-1, 5)
 
         self.ls_tot_speed = list()
-
+        self.visited_cells = set()
         self.ls_theta = []
         self.ls_x = []
         self.ls_y = []
@@ -28,8 +31,7 @@ class Robot:
 
         self.dist_travelled = 0
         self.avg_dist = 0
-        self.flip = 0
-        self.stuck = 0
+
 
         self.sensor = [
             0,
@@ -40,10 +42,10 @@ class Robot:
             0,
         ]  # 1 tactile sensor (sensor[0]) and 5 ultrasound
 
-        self.width = width
-        self.length = width
+        self.width = width * 2
+        self.length = width * 2
         self.collision = 0
-        self.token = 0
+        self.token = 1
 
         self.img = pygame.image.load(robot_img)
         self.img = pygame.transform.scale(self.img, (self.width, self.length))
@@ -65,7 +67,6 @@ class Robot:
         '''
 
         self.sensor[0] = 0
-
         for obstacle in obstacles:
             if self.rect.colliderect(obstacle):
                 self.collision += 1  # this is to keep track of the amount of collisions the robot has made
@@ -104,21 +105,24 @@ class Robot:
 
         if auto:
 
-            states = np.zeros(shape=(1, 10), dtype=object)
-            states[:, 0:-4] = self.sensor
+            # states = np.zeros(shape=(1, 10), dtype=object)
+            # states[:, 0:-4] = self.sensor
             # Give the robot its own state as input
-            states[:, -4] = self.theta
-            states[:, -3] = self.omega
-            states[:, -2] = self.vl
-            states[:, -1] = self.vr
+            # states[:, -4] = self.theta
+            # states[:, -3] = self.omega
+            # states[:, -2] = self.vl
+            # states[:, -1] = self.vr
 
-            actions = np.dot(self.chromosome.T, states.T)
+            #states = np.array([self.sensor])
+            #actions = np.dot(self.chromosome.T, states.T)
 
             # Instead of having 2 options, the robot now has 4
             # such that it is also able to brake
-
-            self.vl += actions[0] * 0.015
-            self.vr += actions[1] * 0.015
+            
+            index = np.where((self.all_states == self.sensor[1:]).all(axis=1))[0][0]
+            actions = self.chromosome[index]
+            self.vl += actions[0] 
+            self.vr += actions[1] 
 
         else:
             if event is not None:
@@ -138,46 +142,9 @@ class Robot:
 
         if self.sensor[0]:
             # Whenever there is a collision we move in the opposite direction
-            # but also dissipate some energy, hence the -0.1
-            self.x += (-0.1 * (self.vr + self.vl) * 0.5 *
-                       math.cos(self.theta) * dt)[0]
-            self.y -= (-0.1 * (self.vr + self.vl) * 0.5 *
-                       math.sin(self.theta) * dt)[0]
-
-        else:
-
-            self.x += (((self.vl + self.vr) / 2) * math.cos(self.theta) *
-                       dt)[0]
-            self.y -= (((self.vl + self.vr) / 2) * math.sin(self.theta) *
-                       dt)[0]
-
-            # check to see if the rotational velocity of the robot is not exceding
-        # the maximum rotational velocity
-
-        self.omega = (self.vr - self.vl) / self.w
-
-        if self.omega >= 0.02 * math.pi:
-            self.flip += 1
-            self.omega = 0.02 * math.pi
-
-        self.theta += self.omega * dt
-
-        if self.theta > 2 * math.pi or self.theta < -2 * math.pi:
-            self.theta = 0
-
-        # Detects if we're within map borders
-
-        if self.x < 0 + 0.5 * self.length:
-            self.x = 0 + 0.5 * self.length
-
-        if self.x >= height - 1.2 * self.length:
-            self.x = height - 1.2 * self.length
-
-        if self.y < 0 + 0.5 * self.width:
-            self.y = 0 + 0.5 * self.width
-
-        if self.y >= width - 1.2 * self.width:
-            self.y = width - 1.2 * self.width
+            # but also dissipate some energy, hence the minus sign
+            self.vr = -0.1 * self.vr
+            self.vl = -0.1 * self.vl
 
         # set min speed
         self.vr = max(self.vr, self.minspeed)
@@ -186,6 +153,35 @@ class Robot:
         # set max speed
         self.vr = min(self.vr, self.maxspeed)
         self.vl = min(self.vl, self.maxspeed)
+            
+        # check to see if the rotational velocity of the robot is not exceding
+        # the maximum rotational velocity
+
+        self.omega = (self.vr - self.vl) / self.w
+        self.theta += self.omega * dt
+
+        if self.theta > 2 * math.pi or self.theta < -2 * math.pi:
+            self.theta = 0
+
+        self.x += (((self.vl + self.vr) / 2) * math.cos(self.theta) *
+                    dt)
+        self.y -= (((self.vl + self.vr) / 2) * math.sin(self.theta) *
+                    dt)
+
+
+        # Detects if we're within map borders
+
+        if self.x < 0 + 0.5 * self.length:
+            self.x = 0 + 2 + 0.5 * self.length
+
+        if self.x >= height - 1.2 * self.length:
+            self.x = height - 2 - 1.2 * self.length
+
+        if self.y < 0 + 0.5 * self.width:
+            self.y = 0 + 2 + 0.5 * self.width
+
+        if self.y >= width - 1.2 * self.width:
+            self.y = width - 2 - 1.2 * self.width
 
         self.rotated = pygame.transform.rotozoom(self.img,
                                                  math.degrees(self.theta), 1)
@@ -203,46 +199,47 @@ class Robot:
                 dist_to_wall = calc_distance((self.x, self.y),
                                              (obstacle.x, obstacle.y))
 
-                if dist_to_wall <= 75:
+                if dist_to_wall <= 70:
                     angle_w_wall = calc_angle((self.x, self.y),
                                               (obstacle.x, obstacle.y))
 
                     if 0 <= angle_w_wall < (math.pi * 2 * 1 / 5):
-                        pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
-                                         (obstacle.x, obstacle.y))
-                        self.sensor[1] = 1 * 1 / max(1, dist_to_wall)
+                        # pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
+                        #                  (obstacle.x, obstacle.y))
+                        self.sensor[1] = 1  #* 1 / max(1, dist_to_wall)
 
                     elif (math.pi * 2 * 1 / 5) <= angle_w_wall < (math.pi * 2 *
                                                                   2 / 5):
-                        pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
-                                         (obstacle.x, obstacle.y))
-                        self.sensor[2] = 1 * 1 / max(1, dist_to_wall)
+                        # pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
+                        #                  (obstacle.x, obstacle.y))
+                        self.sensor[2] = 1 #* 1 / max(1, dist_to_wall)
 
                     elif (math.pi * 2 * 2 / 5) <= angle_w_wall < (math.pi * 2 *
                                                                   3 / 5):
-                        pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
-                                         (obstacle.x, obstacle.y))
-                        self.sensor[3] = 1 * 1 / max(1, dist_to_wall)
+                        # pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
+                        #                  (obstacle.x, obstacle.y))
+                        self.sensor[3] = 1 #* 1 / max(1, dist_to_wall)
 
                     elif (math.pi * 2 * 3 / 5) <= angle_w_wall < (math.pi * 2 *
                                                                   4 / 5):
-                        pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
-                                         (obstacle.x, obstacle.y))
-                        self.sensor[4] = 1 * 1 / max(1, dist_to_wall)
+                        # pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
+                        #                  (obstacle.x, obstacle.y))
+                        self.sensor[4] = 1 #* 1 / max(1, dist_to_wall)
 
                     else:
-                        pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
-                                         (obstacle.x, obstacle.y))
-                        self.sensor[5] = 1 * 1 / max(1, dist_to_wall)
+                        # pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
+                        #                  (obstacle.x, obstacle.y))
+                        self.sensor[5] = 1 #* 1 / max(1, dist_to_wall)
 
     def get_reward(self):
 
         self.avg_dist = math.sqrt((self.init_pos[0] - self.x)**2 +
                                   (self.init_pos[1] - self.y)**2)
+       
+        # score = (self.token * 8 + self.dist_travelled * 2 - self.collision * 1) / (
+        #     self.token  + self.dist_travelled + self.collision)
 
-        score = (self.token * 50 + self.avg_dist * 1 + self.dist_travelled * 1 - self.collision * 2.5) / (
-            self.token + self.avg_dist + self.dist_travelled + self.collision)
-
+        score = (self.dist_travelled / self.m2p)*2 + self.collision * - 2 + self.token * 5
         fitness = score
 
         return float(fitness)

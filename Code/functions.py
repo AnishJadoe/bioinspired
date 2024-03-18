@@ -19,7 +19,8 @@ def get_init_pop(n_robots):
                        # with differing mutation parameters 
 
     for i in range(0, n_robots):
-        population.append(np.random.randint(low=-255, high=255, size=(10, 2)))
+        #population.append(np.random.randint(low=-255, high=255, size=(6, 2)))
+        population.append(np.random.randint(low=-255, high=255, size=(32, 2)))
     return population
 
 

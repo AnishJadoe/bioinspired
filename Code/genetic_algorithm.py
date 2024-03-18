@@ -26,7 +26,7 @@ class GeneticAlgorithm:
         self.best_eval = 0
         self.pop = get_init_pop(self.n_robots)
         self.best = self.pop[0]
-
+        self.best_results = {}
         self.gen = 0
 
         self.cross_rate = cross_rate
@@ -49,7 +49,7 @@ class GeneticAlgorithm:
             other_pop (list): The bottom 80% of the population 
         """
 
-        index = min(-1, -math.floor(self.n_robots * 0.20))  # take best 10%
+        index = min(-1, -math.floor(self.n_robots * 0.20))  # take best 20%
         best_index = np.argsort(np.array(self.scores))[index:]
         best_pop = [self.pop[i] for i in best_index]
         other_index = np.argsort(np.array(self.scores))[:index]
@@ -99,6 +99,29 @@ class GeneticAlgorithm:
 
         return
 
+    def two_point_crossover(self,parent1,parent2):
+        size_chromosome = len(parent1.flatten())
+        random_choice = np.random.sample()
+        cross_point_1 = np.random.randint(low=0,high=size_chromosome)
+        cross_point_2 = np.random.randint(low=cross_point_1,high=size_chromosome)
+
+        child1 = parent1.copy().flatten()
+        child2 = parent2.copy().flatten()
+        self.clone = True
+
+        if self.cross_rate > random_choice:
+            self.clone = False
+            snip_parent_1 = parent1.flatten()[cross_point_1:cross_point_2]
+            snip_parent_2 = parent2.flatten()[cross_point_1:cross_point_2]
+            
+            child1[cross_point_1:cross_point_2] = snip_parent_2
+            child2[cross_point_1:cross_point_2] = snip_parent_1
+
+        else:
+            child1, child2 = parent1, parent2
+
+        return [child1.reshape(parent1.shape), child2.reshape(parent2.shape)]
+        
     def crossover(self, parent1, parent2):
         """The crossover operator of the algorithm, it takes 2 parent chromosomes and 
         uses either a horizontal (row) or vertical (column) method  for crossover 
@@ -160,7 +183,6 @@ class GeneticAlgorithm:
             
             print(f"GENERATION: {gen}")
             self.scores = run_simulation(sim_time, self.pop, self.n_robots, self)
-            self.best_eval = self.scores[0]
             
             for i in range(self.n_robots):
                 if self.scores[i] > self.best_eval:
@@ -168,6 +190,7 @@ class GeneticAlgorithm:
                     print(
                         f"Generation {gen} gives a new best with score {self.scores[i]}"
                     )
+            
             # selected = [self.selection() for _ in range(self.n_robots)]
             ls_p1, ls_p2 = self.selection()
 
@@ -179,7 +202,7 @@ class GeneticAlgorithm:
                 parent1 = ls_p1[random_parent1]
                 flip = np.random.uniform(0, 1)
 
-                if flip > 0.3:
+                if flip > 0.2:
                     # Let the parent mate with another parent from the top 20%
 
                     random_parent2 = np.random.randint(0, len(ls_p1))
@@ -190,27 +213,15 @@ class GeneticAlgorithm:
                     random_parent2 = np.random.randint(0, len(ls_p2))
                     parent2 = ls_p2[random_parent2]
 
-                for c in self.crossover(parent1, parent2):
+                for c in self.two_point_crossover(parent1, parent2):
+                    self.mutation(c)
+                    children.append(c)
 
-                    if not self.clone:
-                        self.mutation(c)
-                        children.append(c)
-                    else:
-                        children.append(c)
 
                 if len(children) >= self.n_robots:
                     mating = False
 
-            # for i in range(0, self.n_robots, 2):
-            #     p1, p2 = selected[i], selected[i + 1]
-            
-            #     for c in self.crossover(p1, p2):
-            #         if not self.clone:
-            #             self.mutation(c)
-            #             children.append(c)
-            #         else:
-            #             children.append(c)
-
+            self.best_results[f'generation_{gen}'] = (self.best,self.best_eval)
             self.pop = children
             self.gen += 1
 

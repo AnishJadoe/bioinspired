@@ -45,7 +45,7 @@ def plot_results(epochs, time,run, ls_cross, ls_mut):
         for mut_rate in ls_mut:
             print(f'USING A MUTATION RATE OF: {mut_rate}')
             GA = GeneticAlgorithm(
-                n_robots=2 * 10, n_iter=epochs, cross_rate=0.8, mut_rate=mut_rate
+                n_robots=2 * 20, n_iter=epochs, cross_rate=0.8, mut_rate=mut_rate
             )  # n_robots should be an equal number for crossover to work
 
             best, best_eval = GA.main(time)
@@ -69,7 +69,7 @@ def plot_results(epochs, time,run, ls_cross, ls_mut):
         for cross_rate in ls_cross:
             print(f'USING A CROSSOVER RATE OF: {cross_rate}')
             GA = GeneticAlgorithm(
-                n_robots=2 * 10, n_iter=epochs, cross_rate=cross_rate, mut_rate=0.1
+                n_robots=2 * 15, n_iter=epochs, cross_rate=cross_rate, mut_rate=1
             )  # n_robots should be an equal number for crossover to work
 
             best, best_eval = GA.main(time)
@@ -95,5 +95,6 @@ def plot_results(epochs, time,run, ls_cross, ls_mut):
     ax_abs_distance.legend()
     ax_rel_distance.legend()
     ax_token.legend()
-
+    print(GA.best, GA.best_eval)
+    print(GA.best_results)
     plt.show()

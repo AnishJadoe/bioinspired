@@ -2,21 +2,26 @@ import numpy as np
 import pygame
 
 
+BLACK= (0, 0, 0, 255)
+YELLOW = (255, 255, 0, 255)
 class Walls:  # change name to world
-    def __init__(self, size, dimensions):
-        self.black = (0, 0, 0)
-        self.yellow = (255, 255, 0)
-
-        self.size = size
-        self.width = dimensions[1]
-        self.height = dimensions[0]
+    def __init__(self,world :pygame.surface, cell_size):
+    
+        self.world = world
+        self.world_width, self.world_height = world.get_size() 
+        self.size = cell_size
         self.amount_tokens = 20
 
-        self.cellMAP = self.get_maze_map()
+        self.world_data = self.get_world_data()
         self.grid = self.get_grid()
-        self.obstacles = self.get_obs()
-        self.tokens = list()
+        self.move_cells = self.get_move_cells()
+        self.obstacles = self.get_obstacles()
+        self.tokens = self.get_tokens()
 
+    def get_world_data(self):
+        
+        return np.array([[int(self.world.get_at((x, y)) == BLACK) for x in range(0,self.world_width,self.size)] for y in range(0,self.world_height,self.size)]).T
+    
     def get_maze_map(self):
 
         WALL = 0
@@ -24,13 +29,13 @@ class Walls:  # change name to world
 
         np.random.seed(42)
         cellMAP = np.random.choice([1, 0],
-                                   size=(int(self.height / self.size),
-                                         int(self.width / self.size)),
+                                   size=(int(self.world_height / self.size),
+                                         int(self.world_width / self.size)),
                                    p=[0.60, 0.40])
 
         generations = 2
-        GRIDHEIGHT = int(self.height / self.size)
-        GRIDWIDTH = int(self.width / self.size)
+        GRIDHEIGHT = int(self.world_height / self.size)
+        GRIDWIDTH = int(self.world_width / self.size)
 
         if generations > 1:
             for generation in range(generations):
@@ -92,44 +97,61 @@ class Walls:  # change name to world
 
         grid = []
 
-        for x in range(0, self.height, self.size):
-            for y in range(0, self.width, self.size):
+        for x in range(0, self.world_height, self.size):
+            for y in range(0, self.world_width, self.size):
                 rect = pygame.Rect(x, y, self.size, self.size)
                 grid.append(rect)
 
         return grid
 
-    def get_obs(self):
+    def get_obstacles(self):
 
         obs = []
-
-        for index in range(0, len(self.grid)):
-            if self.cellMAP.flatten()[index] == 0:
-                obs.append(self.grid[index])
+        for cell in self.grid:
+            x = int(cell.y/self.size) # Check middle of the cell 
+            y = int(cell.x/self.size)
+            if self.world_data[x][y] == 1:
+                copy_cell = cell.copy()
+                rotate_x = cell.y
+                rotate_y = cell.x
+                copy_cell.x = rotate_x
+                copy_cell.y = rotate_y
+                obs.append(copy_cell)
 
         return obs
 
+    def get_move_cells(self):
+        move_cells = []
+        
+        for cell in self.grid:
+            x = int(cell.y/self.size) 
+            y = int(cell.x/self.size)
+            if self.world_data[x][y] == 0:
+                copy_cell = cell.copy()
+                rotate_x = cell.y
+                rotate_y = cell.x
+                copy_cell.x = rotate_x
+                copy_cell.y = rotate_y
+                move_cells.append(copy_cell)
+                
+        return move_cells
+    
     def get_tokens(self):
+        
+        tokens = []
+        for i in range(self.amount_tokens):
+            token_idx = np.random.randint(low=0, high=len(self.move_cells))
+            tokens.append(self.move_cells[token_idx])
+            
+        return tokens 
 
-        ls_coors = []
-
-        for index in range(0, len(self.grid)):
-            if self.cellMAP.flatten()[index] == 1:
-                ls_coors.append(self.grid[index])
-
-        for i in range(0, self.amount_tokens):
-            token_idx = np.random.randint(low=0, high=len(ls_coors))
-            if len(self.tokens) < 20:
-                self.tokens.append(ls_coors[token_idx])
-
-    def draw(self, map, robots):
-
+    def draw_walls(self,map):
         for ob in self.obstacles:
-            pygame.draw.rect(map, self.black, ob, 0)
-
+            pygame.draw.rect(map, BLACK, ob, 0)
+        
+    def update_tokens(self, map, robots):
         for token in self.tokens:
-            pygame.draw.rect(map, self.yellow, token, 0)
-
+            pygame.draw.rect(map, YELLOW, token, 0)
             for robot in robots:
                 if token.colliderect(robot.rect):
                     self.tokens.pop(self.tokens.index(token))

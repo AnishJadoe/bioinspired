@@ -1,23 +1,20 @@
 from walls import Walls
 from robot import Robot
-from environment import Envir
+from world import World
 from draw import Draw
 import pygame
 import numpy as np
 import os
 
 # Initialize the robot
-start = (300, 200)
+start = (300, 400)
 
 script_dir = os.path.dirname(__file__)
 rel_path = "../Images/robot.png"
 img_path = os.path.join(script_dir, rel_path)
 
-np.random.RandomState()
 
 # MAIN GAME LOOP
-
-
 def run_simulation(time, pop, n_robots, GA):
     """This is the main game loop of the algorithm, it is called by the Genetic Algorithm class in 
     the main loop. It yields the scores of the corresponding individual chromosomes and saves the result of each run to the genetic algorithm class 
@@ -32,6 +29,7 @@ def run_simulation(time, pop, n_robots, GA):
         scores (float)]: The scores given to each individual 
     """
     pygame.init()
+    pygame.display.set_mode(size=(1400,800),display=0)
 
     global start
     global img_path
@@ -48,13 +46,11 @@ def run_simulation(time, pop, n_robots, GA):
     tot_token = list()
 
     dims = (1400, 800)
-
-    environment = Envir(dims)
-    environment.map.fill((255, 255, 255))
+    world = World(dims)
+    world.draw_H_world()
 
     # Obtain the walls
-    wall = Walls(20, dims)
-
+    wall = Walls(world=world.map,cell_size=20)
     draw = Draw(dims)
 
     for i in range(n_robots):
@@ -62,46 +58,30 @@ def run_simulation(time, pop, n_robots, GA):
 
     dt = 0
     lasttime = pygame.time.get_ticks()
+    
     # Simulation loop
     while pygame.time.get_ticks() <= time:
-        clock.tick(120)
-
-        for event in pygame.event.get():
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == 48:
-                    robot.x = 200
-                    robot.y = 200
-
-            if event.type == pygame.QUIT:
-                pygame.quit()
-
-            for robot in ls_robots:
-                robot.move(environment.height,
-                           environment.width,
-                           dt,
-                           event,
-                           auto=True)
-
+        clock.tick(20)
         dt = (pygame.time.get_ticks() - lasttime) / 1000
-        lasttime = pygame.time.get_ticks()
-
-        wall.get_tokens() # Populate the world with rewards 
-        environment.map.fill((255, 255, 255))
-        wall.draw(environment.map, ls_robots)
-
+        
+        # Update frame by redrawing everything
+        world.map.fill((255,255,255))
+        wall.draw_walls(world.map)
+        wall.update_tokens(world.map, ls_robots)
+        
+        
         for robot in ls_robots:
-            robot.get_sensor(wall.obstacles, environment.map) 
+            robot.get_sensor(wall.obstacles, world.map) 
             if sum(robot.sensor[1:]) > 0:
                 robot.get_collision(wall.obstacles)
-            robot.move(environment.height, environment.width, dt, auto=True)
-
-            robot.draw(environment.map)
+            robot.move(world.height, world.width, dt, auto=True)
+            robot.draw(world.map)
 
         draw.write_info(gen=GA.gen,
                         time=pygame.time.get_ticks() / 1000,
-                        map=environment.map)
+                        map=world.map)
 
+        lasttime = pygame.time.get_ticks()
         pygame.display.update()
 
     pygame.quit()
