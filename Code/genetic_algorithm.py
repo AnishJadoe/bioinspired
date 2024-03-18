@@ -72,7 +72,7 @@ class GeneticAlgorithm:
         """
         random_choice = np.random.sample()
 
-        if random_choice > self.mut_rate:
+        if self.mut_rate > random_choice:
 
             unequal = True
 
@@ -202,7 +202,7 @@ class GeneticAlgorithm:
                 parent1 = ls_p1[random_parent1]
                 flip = np.random.uniform(0, 1)
 
-                if flip > 0.2:
+                if flip > 0.6:
                     # Let the parent mate with another parent from the top 20%
 
                     random_parent2 = np.random.randint(0, len(ls_p1))
