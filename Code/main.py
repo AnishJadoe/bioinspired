@@ -10,13 +10,13 @@ from map_generator.txt_to_map import WorldMap
 
 np.random.seed(30)
 
-epochs = 1
+epochs = 20
 time = 60000
-n_robots = 20
+n_robots = 4
 ls_cross_rate = [1]
 ls_mut_rate = [1]
 
-wm = WorldMap(skeleton_file="Maps/H_map.txt", map_width=60, map_height=40, tile_size=20)
+wm = WorldMap(skeleton_file="Maps/H_map.txt", map_width=60, map_height=40, tile_size=15)
 GA = GeneticAlgorithmRunner(
     world_map=wm,
     n_robots=n_robots,
@@ -30,5 +30,5 @@ GA.run()
 
 # GA.save_run("saved_runs/test_run_4")
 
-# plot_mean_results(GA)
+plot_mean_results(GA)
 # plot_top_20_results(GA)

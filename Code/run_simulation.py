@@ -42,7 +42,7 @@ def run_simulation(wm: WorldMap, time, pop, n_robots):
 
     for i in range(n_robots):
         ls_robots.append(
-            Robot((wm.start_pos.x, wm.start_pos.y), width=15, chromosome=pop[i])
+            Robot((wm.start_pos.x, wm.start_pos.y), width=20, chromosome=pop[i])
         )
 
     dt = 0
@@ -56,13 +56,10 @@ def run_simulation(wm: WorldMap, time, pop, n_robots):
         # Update frame by redrawing everything
         wm.update_map(ls_robots)
         for robot in ls_robots:
-            FOV = robot.find_obstacles(wm)
-            robot.get_sensor_FOV(FOV)
-            wall_collided = robot.get_collision(wm)
-            robot.move(wall_collided, dt, auto=True)
+            robot.find_obstacles(robot.get_FOV(wm))
+            robot.move(robot.get_collision(wm), dt, auto=True)
             robot.draw(wm.surf)
 
-        print(f"Time Elapsed {pygame.time.get_ticks() / 1000}")
         lasttime = pygame.time.get_ticks()
         pygame.display.update()
 

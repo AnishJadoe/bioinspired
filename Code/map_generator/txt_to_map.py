@@ -74,7 +74,7 @@ class WorldMap:
     def update_map(self, robots):
         for token in self.tokens:
             for robot in robots:
-                if token.colliderect(robot.rect):
+                if token.colliderect(robot.hitbox):
                     self.tokens.pop(self.tokens.index(token))
                     robot.token += 1
                     break
