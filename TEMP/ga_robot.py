@@ -1,16 +1,40 @@
 import numpy as np
-from wheeled_robot_classv2 import Robot, Walls, Envir
+from Code.robot import Robo
+from Code.constants import * 
 import pygame
 
-chromosome = np.array([[-25., -114.],
-                       [-101., -101.],
-                       [-212., -114.],
-                       [-101., -101.],
-                       [-101., -162.],
-                       [-101., -101.],
-                       [-162., -101.],
-                       [-212., 66.],
-                       [-101., 144.]],
+chromosome = np.array([[ 23 , 11],
+ [ 43,  44],
+ [-48,   4],
+ [-42, -12],
+ [-25, -17],
+ [-22,   3],
+ [ 35, -32],
+ [-17, -34],
+ [-46,   1],
+ [-24, -48],
+ [-23, -16],
+ [-15, -35],
+ [-43, -30],
+ [ 17,  31],
+ [ 41,  -9],
+ [ 10, -29],
+ [-30,  43],
+ [ 24, -44],
+ [ 44,  23],
+ [ 45, -38],
+ [-21, -27],
+ [  0, -30],
+ [ 32, -22],
+ [-19, -21],
+ [-22,  38],
+ [ 37, -22],
+ [-41, -33],
+ [-17, -34],
+ [ 23, -34],
+ [ 33,  37],
+ [ 18,  43],
+ [-45, -11]],
                       )
 
 time = 30000
@@ -18,12 +42,10 @@ time = 30000
 pygame.init()
 
 # Initialize the robot
-start = (300, 200)
 img_path = "/Users/anishjadoenathmisier/Documents/GitHub/BioInspiredIntelligence/robot.png"
 
 robot = (Robot(start, img_path, 20, chromosome))
-dims = (1200, 800)
-env = Envir(dims)
+env = Envir(WORLD)
 wall = Walls(20, dims)
 
 env.map.fill((255, 255, 255))

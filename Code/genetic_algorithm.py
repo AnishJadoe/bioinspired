@@ -2,32 +2,34 @@ from functions import get_init_pop
 from run_simulation import run_simulation
 import math
 import numpy as np
+import pickle
 
 
-class GeneticAlgorithm:
+class GeneticAlgorithmRunner:
     """This class does all the work that is needed for a genetic algorithm,
-    there is a mutation, crossover and selection operator available for which all the 
-    parameters can be changed as needed 
+    there is a mutation, crossover and selection operator available for which all the
+    parameters can be changed as needed
     """
 
-    def __init__(self, n_robots, n_iter, cross_rate, mut_rate):
-        """Initialization of the class 
+    def __init__(self, world_map, n_robots, epochs, run_time, cross_rate, mut_rate):
+        """Initialization of the class
 
         Args:
             n_robots (int): The amount of robots in the population
-            n_iter (int): The amount of epochs that the simulation will run for
-            cross_rate (float): The crossover rate of the crossover operator 
-            mut_rate (float): The mutation rate of the mutation operator 
+            epochs (int): The amount of epochs that the simulation will run for
+            cross_rate (float): The crossover rate of the crossover operator
+            mut_rate (float): The mutation rate of the mutation operator
         """
 
+        self.world_map = world_map
         self.n_robots = n_robots
-        self.n_iter = n_iter
-        self.scores = list()
+        self.epochs = epochs
+        self.fitness = list()
         self.best_eval = 0
         self.pop = get_init_pop(self.n_robots)
-        self.best = self.pop[0]
-        self.best_results = {}
+        self.best_agent = self.pop[0]
         self.gen = 0
+        self.run_time = run_time
 
         self.cross_rate = cross_rate
         self.mut_rate = mut_rate
@@ -39,6 +41,8 @@ class GeneticAlgorithm:
         self.rel_dist_gen = list()
         self.flips_gen = list()
         self.token_gen = list()
+        self.results = dict()
+        self.all_populations = dict()
 
     def selection(self):  # k=5
         """The selection operator used for this algorithm, it takes the best 20%
@@ -46,13 +50,13 @@ class GeneticAlgorithm:
 
         Returns:
             best_pop (list): The top 20% of the population
-            other_pop (list): The bottom 80% of the population 
+            other_pop (list): The bottom 80% of the population
         """
 
         index = min(-1, -math.floor(self.n_robots * 0.20))  # take best 20%
-        best_index = np.argsort(np.array(self.scores))[index:]
+        best_index = np.argsort(np.array(self.fitness))[index:]
         best_pop = [self.pop[i] for i in best_index]
-        other_index = np.argsort(np.array(self.scores))[:index]
+        other_index = np.argsort(np.array(self.fitness))[:index]
 
         other_pop = [self.pop[i] for i in other_index]
 
@@ -65,15 +69,14 @@ class GeneticAlgorithm:
 
     def mutation(self, individual):
         """This is the mutation operator of the genetic algorithm, it takes an
-        indivual and swaps 2 loci on the chromosome matrix 
+        indivual and swaps 2 loci on the chromosome matrix
 
         Args:
-            individual (numpy array): The individual on which the mutation will be preformed 
+            individual (numpy array): The individual on which the mutation will be preformed
         """
         random_choice = np.random.sample()
 
         if self.mut_rate > random_choice:
-
             unequal = True
 
             while unequal:
@@ -81,15 +84,15 @@ class GeneticAlgorithm:
                 random_row_s = np.random.randint(low=0, high=individual.shape[0])
                 random_column_s = np.random.randint(low=0, high=individual.shape[1])
 
-                # Row and column with which we want to swap the orginal data point with 
+                # Row and column with which we want to swap the orginal data point with
                 random_row_e = np.random.randint(low=0, high=individual.shape[0])
                 random_column_e = np.random.randint(low=0, high=individual.shape[1])
 
                 if (random_row_s != random_row_e) or (
                     random_column_s != random_column_e
                 ):
-                    # only if the rows or column are not the same we will swap the data points 
-                    unequal = False 
+                    # only if the rows or column are not the same we will swap the data points
+                    unequal = False
 
             p_start = individual[random_row_s, random_column_s]
             p_end = individual[random_row_e, random_column_e]
@@ -99,11 +102,11 @@ class GeneticAlgorithm:
 
         return
 
-    def two_point_crossover(self,parent1,parent2):
+    def two_point_crossover(self, parent1, parent2):
         size_chromosome = len(parent1.flatten())
         random_choice = np.random.sample()
-        cross_point_1 = np.random.randint(low=0,high=size_chromosome)
-        cross_point_2 = np.random.randint(low=cross_point_1,high=size_chromosome)
+        cross_point_1 = np.random.randint(low=0, high=size_chromosome)
+        cross_point_2 = np.random.randint(low=cross_point_1, high=size_chromosome)
 
         child1 = parent1.copy().flatten()
         child2 = parent2.copy().flatten()
@@ -113,7 +116,7 @@ class GeneticAlgorithm:
             self.clone = False
             snip_parent_1 = parent1.flatten()[cross_point_1:cross_point_2]
             snip_parent_2 = parent2.flatten()[cross_point_1:cross_point_2]
-            
+
             child1[cross_point_1:cross_point_2] = snip_parent_2
             child2[cross_point_1:cross_point_2] = snip_parent_1
 
@@ -121,18 +124,18 @@ class GeneticAlgorithm:
             child1, child2 = parent1, parent2
 
         return [child1.reshape(parent1.shape), child2.reshape(parent2.shape)]
-        
+
     def crossover(self, parent1, parent2):
-        """The crossover operator of the algorithm, it takes 2 parent chromosomes and 
-        uses either a horizontal (row) or vertical (column) method  for crossover 
+        """The crossover operator of the algorithm, it takes 2 parent chromosomes and
+        uses either a horizontal (row) or vertical (column) method  for crossover
 
         Args:
-            parent1 (numpy array): The first parent used for crossover 
-            parent2 (numpy array): The second parent used for crossover 
+            parent1 (numpy array): The first parent used for crossover
+            parent2 (numpy array): The second parent used for crossover
 
         Returns:
             [child1, child2] (list): A list containing both the first and second child
-            obtained after crossover 
+            obtained after crossover
         """
 
         random_choice = np.random.sample()
@@ -169,7 +172,7 @@ class GeneticAlgorithm:
 
         return [child1, child2]
 
-    def main(self, sim_time):
+    def run(self):
         """This is the main loop for the algorithm. First a base score is set-up by running the algorithm with the inital population
 
         Args:
@@ -179,25 +182,28 @@ class GeneticAlgorithm:
             [type]: [description]
         """
 
-        for gen in range(self.n_iter):
-            
+        for gen in range(self.epochs):
             print(f"GENERATION: {gen}")
-            self.scores = run_simulation(sim_time, self.pop, self.n_robots, self)
-            
+            self._save_population()
+            population_results = run_simulation(
+                self.world_map, self.run_time, self.pop, self.n_robots
+            )
+            self._save_results(population_results)
+
+            self.fitness = population_results["pop_fitness"]
             for i in range(self.n_robots):
-                if self.scores[i] > self.best_eval:
-                    self.best, self.best_eval = self.pop[i], self.scores[i]
+                if self.fitness[i] > self.best_eval:
+                    self.best_agent, self.best_eval = self.pop[i], self.fitness[i]
                     print(
-                        f"Generation {gen} gives a new best with score {self.scores[i]}"
+                        f"Generation {gen} gives a new best \
+                            with score {self.fitness[i]}"
                     )
-            
-            # selected = [self.selection() for _ in range(self.n_robots)]
+
             ls_p1, ls_p2 = self.selection()
 
             children = list()
             mating = True
             while mating:
-
                 random_parent1 = np.random.randint(0, len(ls_p1))
                 parent1 = ls_p1[random_parent1]
                 flip = np.random.uniform(0, 1)
@@ -217,37 +223,34 @@ class GeneticAlgorithm:
                     self.mutation(c)
                     children.append(c)
 
-
                 if len(children) >= self.n_robots:
                     mating = False
 
-            self.best_results[f'generation_{gen}'] = (self.best,self.best_eval)
             self.pop = children
             self.gen += 1
 
-        return self.best, self.best_eval
+        return
 
-    def get_results(self, result):
+    def _save_population(self):
+        self.all_populations[self.gen] = self.pop
 
-        if result == "fitness":
-            result = self.reward_gen
+    def _save_results(self, population_results):
+        results_this_gen = {}
 
-        if result == "tot_dist":
-            result = self.dist_gen
+        results_this_gen["fitness"] = population_results["pop_fitness"]
+        results_this_gen["abs_dist"] = population_results["pop_abs_distance"]
+        results_this_gen["rel_dist"] = population_results["pop_rel_distance"]
+        results_this_gen["collisions"] = population_results["pop_collisions"]
+        results_this_gen["tokens"] = population_results["pop_token"]
+        results_this_gen["best_eval"] = self.best_eval
+        results_this_gen["best_agent"] = self.best_agent
 
-        if result == "rel_dist":
-            result = self.rel_dist_gen
+        self.results[self.gen] = results_this_gen
 
-        if result == "flip":
-            result = self.flips_gen
-
-        if result == "coll":
-            result = self.coll_gen
-
-        if result == "token":
-            result = self.token_gen
-
-        return result
+    def save_run(self, run_name):
+        self.world_map = []  # Can't save pygame surface
+        with open(run_name, "wb") as f:
+            pickle.dump(self, f)
 
     def best_gen(self):
-        return self.best
+        return self.best_agent

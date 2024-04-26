@@ -1,6 +1,7 @@
 import numpy as np
 import pygame
 import math
+from map_generator.txt_to_map import WorldMap
 from functions import calc_distance
 from functions import calc_angle
 from constants import *
@@ -41,10 +42,10 @@ class Robot:
         self.theta = 0
         self.vl = 1
         self.vr = 1
-        self.maxspeed = 100
-        self.minspeed = -100
+        self.maxspeed = 255
+        self.minspeed = -255
         self.all_states = np.array(np.meshgrid([0, 1],[0,1],[0,1],[0,1],[0,1])).T.reshape(-1, 5)
-        self.collision_angle = 0
+        self.wall_collided = -1
         self.ls_tot_speed = list()
         self.visited_cells = set()
         self.ls_theta = []
@@ -68,7 +69,7 @@ class Robot:
         self.width = width 
         self.length = width 
         self.collision = 0
-        self.token = 1
+        self.token = 0
 
         self.img = pygame.image.load("Images/robot.png")
         self.sensor_on = pygame.image.load("Images/distance_sensor_on.png")
@@ -97,7 +98,7 @@ class Robot:
         #     world.blit(sensor_image, sensor_rect_obj)
         
 
-    def get_collision(self, FOV):
+    def get_collision_FOV(self, FOV):
         '''
         Function to check if we have collided with an obstacle, the sensor
         value is changed whenever there is a collision
@@ -117,6 +118,18 @@ class Robot:
                 
             
             self.sensor[0] = 1
+        
+    def get_collision(self, world_map: WorldMap):
+        """Function to calculate whetere collisions between the walls and the agent have occured
+        """
+        index = self.rect.collidelist(world_map.walls)
+        if index != -1:
+            self.collision += 1
+            self.sensor[0] = 1
+            return world_map.walls[index]
+        else:
+            return 0
+        
 
     def get_token(self, tokens):
         '''
@@ -130,7 +143,7 @@ class Robot:
                 print(self.token)
                 tokens.pop(token)
 
-    def move(self, map, dt, event=None, auto=False):
+    def move(self, wall_collided, dt, event=None, auto=False):
 
         self.ls_x.append(self.x)
         self.ls_y.append(self.y)
@@ -165,20 +178,6 @@ class Robot:
 
                     elif event.key == 56:  # 0 is decelerate right
                         self.vr -= 0.01 * self.m2p
-
-        if self.sensor[0]:  # Check if collision sensor is activated (indicating a collision)            
-            # Calculate the new direction of motion by reflecting the velocity vector
-            new_vr = -0.8 * self.vr
-            new_vl = -0.8 * self.vl 
-            
-            # Update the velocities with the new direction
-            self.vr = new_vr
-            self.vl = new_vl
-            
-            self.x += (((self.vl + self.vr) / 2) * math.cos(self.collision_angle - self.theta) *
-                        dt)
-            self.y += (((self.vl + self.vr) / 2) * math.sin(self.collision_angle - self.theta) *
-                        dt)
             
         # set min speed
         self.vr = max(self.vr, self.minspeed)
@@ -197,7 +196,30 @@ class Robot:
         if self.theta > 2 * math.pi or self.theta < -2 * math.pi:
             self.theta = 0
 
-        if not self.sensor[0]:
+        if self.sensor[0]:
+            # Approach wall from Top Left
+            if self.x > wall_collided.x \
+                    and self.y > wall_collided.y:  
+                self.x += 1
+                self.y += 1
+            # Approach wall from Top Left
+            elif self.x <= wall_collided.x \
+                    and self.y > wall_collided.y:  
+                self.x -= 1
+                self.y += 1
+            # Approach wall from Bottom Left
+            elif self.x > wall_collided.x \
+                    and self.y <= wall_collided.y:  
+                self.x += 1
+                self.y -= 1
+            # Approach wall from Bottom Right
+            elif self.x <= wall_collided.x \
+                    and self.y <= wall_collided.y:  
+                self.x -= 1
+                self.y -= 1
+            else:  # Edge case, assume flip whole car
+                self.theta += math.pi * 0.5 
+        else:
             self.x += (((self.vl + self.vr) / 2) * math.cos(self.theta) *
                         dt)
             self.y -= (((self.vl + self.vr) / 2) * math.sin(self.theta) *
@@ -222,81 +244,35 @@ class Robot:
 
         return
 
-    def get_sensor_FOV(self,FOV):
+    def get_sensor_FOV(self, FOV):
         # ASSUME FOV always 
         self.sensor = [0, 0, 0, 0, 0, 0]
-        if FOV[0:4,0:3].sum() >= 1: # Top left
+        if FOV[0:3, 0:3].sum() >= 1:  # Top left
             self.sensor[5] = 1
-        if FOV[0:4,3].sum() >=1: # Center
+        if FOV[0:3, 2].sum() >= 1:  # Center
             self.sensor[1] = 1
-        if FOV[0:4,4:-1].sum() >= 1: # Top Right
+        if FOV[0:3, 3:-1].sum() >= 1:  # Top Right
             self.sensor[2] = 1 
-        if FOV[4:-1,0:-3].sum() >= 1: # Bot right
+        if FOV[3:-1, 0:3].sum() >= 1:  # Bot right
             self.sensor[3] = 1
-        if FOV[4:-1,4:-1].sum() >= 1: # Bot left
+        if FOV[3:-1, 3:-1].sum() >= 1:  # Bot left
             self.sensor[4] = 1
         return
     
-    def get_sensor(self, obstacles, map):
-
-        if self.sensor[0] == 0:
-
-            self.sensor = [0, 0, 0, 0, 0, 0]
-
-            for obstacle in obstacles:
-                dist_to_wall = calc_distance((self.x, self.y),
-                                             (obstacle.x, obstacle.y))
-
-                if dist_to_wall <= 70:
-                    angle_w_wall = calc_angle((self.x, self.y),
-                                              (obstacle.x, obstacle.y))
-
-                    if 0 <= angle_w_wall < (math.pi * 2 * 1 / 5):
-                        # pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
-                        #                  (obstacle.x, obstacle.y))
-                        self.sensor[1] = 1  #* 1 / max(1, dist_to_wall)
-
-                    elif (math.pi * 2 * 1 / 5) <= angle_w_wall < (math.pi * 2 *
-                                                                  2 / 5):
-                        # pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
-                        #                  (obstacle.x, obstacle.y))
-                        self.sensor[2] = 1 #* 1 / max(1, dist_to_wall)
-
-                    elif (math.pi * 2 * 2 / 5) <= angle_w_wall < (math.pi * 2 *
-                                                                  3 / 5):
-                        # pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
-                        #                  (obstacle.x, obstacle.y))
-                        self.sensor[3] = 1 #* 1 / max(1, dist_to_wall)
-
-                    elif (math.pi * 2 * 3 / 5) <= angle_w_wall < (math.pi * 2 *
-                                                                  4 / 5):
-                        # pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
-                        #                  (obstacle.x, obstacle.y))
-                        self.sensor[4] = 1 #* 1 / max(1, dist_to_wall)
-
-                    else:
-                        # pygame.draw.line(map, (255, 0, 0), (self.x, self.y),
-                        #                  (obstacle.x, obstacle.y))
-                        self.sensor[5] = 1 #* 1 / max(1, dist_to_wall)
-
-    def get_reward(self, map):
+    def get_reward(self):
 
         self.avg_dist = math.sqrt((self.init_pos[0] - self.x)**2 +
                                   (self.init_pos[1] - self.y)**2)
-       
-        for i, x_pos in enumerate(self.ls_x):
-            self.visited_cells.add(find_closest_cell((x_pos,self.ls_y[i]),map.move_cells))
-
-        score = (self.dist_travelled / self.m2p)*5 + self.collision * - 1 + self.token * 20 + len(self.visited_cells) * 15
-        fitness = score
-        return float(fitness)
-    
-    def find_obstacles(self,map):
-        FOV_size = 3
+        
+        return (self.dist_travelled / self.m2p)*10 + \
+            self.token * 100 - self.collision# + len(self.visited_cells) * 15
+          
+    def find_obstacles(self, map):
+        FOV_size = 2
         current_pos_x = int(self.x/20)
         current_pos_y = int(self.y/20)
-        FOV = map.world_data[current_pos_x-FOV_size : current_pos_x+FOV_size+1, current_pos_y-FOV_size : current_pos_y+FOV_size+1]
-        if FOV.shape != (7,7):
+        FOV = map.binary_map[current_pos_x-FOV_size : current_pos_x+FOV_size+1, current_pos_y-FOV_size : current_pos_y+FOV_size+1]
+        if FOV.shape != (5,5):
             FOV = np.ones((7,7))
         # FOV = np.where((abs(np.array(map.grid) - self.rect) <= FOV_size).all(axis=1))[0]
         # np.where((abs(np.array(map.grid) - self.rect) <= FOV_size).all(axis=1))

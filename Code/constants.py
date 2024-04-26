@@ -1,3 +1,9 @@
 # Map 
 START_POSITION = (300, 400) # Has to be + 10
 MAP_SIZE = (1400, 800)
+
+# COLORS
+BLACK = (0, 0, 0, 255)
+WHITE = (255, 255, 255, 255)
+YELLOW = (255, 255, 0, 255)
+RED = (255, 100, 50, 255)
