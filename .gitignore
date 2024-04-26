@@ -5,5 +5,7 @@
 !.vscode/launch.json
 !.vscode/extensions.json
 
+*.pyc
 .idea/*
-Code/__pycache__/**
+**/__pycache__/
+/saved_runs/*
