@@ -1,6 +1,6 @@
 import pygame 
 import numpy as np
-from constants import *
+from ..utility.constants import *
 
 
 class WorldMap:
@@ -71,13 +71,8 @@ class WorldMap:
     def _draw_start_position(self, obj: pygame.Rect):
         pygame.draw.rect(self.surf, RED, obj)
     
-    def update_map(self, robots):
-        for token in self.tokens:
-            for robot in robots:
-                if token.colliderect(robot.hitbox):
-                    self.tokens.pop(self.tokens.index(token))
-                    robot.token += 1
-                    break
+    def update_map(self):
+
         self.surf.fill(WHITE)
         self._draw_start_position(self.start_pos)
         for wall in self.walls:

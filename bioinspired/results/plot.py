@@ -1,8 +1,7 @@
 # Loading in functions
 import matplotlib.pyplot as plt
 import numpy as np
-import math
-from genetic_algorithm import GeneticAlgorithmRunner
+from src.runners.genetic_algorithm import GeneticAlgorithmRunner
 
 plt.style.use("bmh")
 
@@ -20,19 +19,48 @@ def split_array(array):
 
     return largest_20_percent, smallest_80_percent
 
+def plot_diversity(GA:GeneticAlgorithmRunner):
+    fig,ax_fitness = plt.subplots()
+    ax_fitness.set(
+        xlabel="Fitness",
+        ylabel="Probability",
+        title="Distribution of fitness per generation"
+    )
+    fig,ax_distance = plt.subplots()
+    ax_distance.set(
+        xlabel="Distance Travelled",
+        ylabel="Probability",
+        title="Distribution of distance travelled per generation"
+    )
+
+    fig,ax_collisions = plt.subplots()
+    ax_collisions.set(
+        xlabel="Collisions",
+        ylabel="Probability",
+        title="Distribution of collisions per generation"
+    )
+    
+    for generation, result in GA.results.items():
+        ax_fitness.hist(x=result["fitness"],label=f'Generation {generation}',alpha=0.7)
+        #ax_fitness.vlines(x=np.mean(result["fitness"]), ymin=0,ymax=100)
+
+        ax_distance.hist(x=result["abs_dist"],label=f'Generation {generation}',alpha=0.7)
+        #ax_distance.vlines(x=np.mean(result["abs_dist"]), ymin=0,ymax=100)
+
+        ax_collisions.hist(x=result["collisions"],label=f'Generation {generation}',alpha=0.7)
+        #ax_collisions.vlines(x=np.mean(result["collisions"]), ymin=0,ymax=100)
+
+    ax_fitness.legend() 
+    ax_distance.legend()
+    ax_collisions.legend()
+    
+    plt.show()
 
 def plot_mean_results(GA: GeneticAlgorithmRunner):
     x = range(0, GA.epochs)
     fig_fitness, ax_fitness = plt.subplots()
     ax_fitness.set(
         xlabel="Generation", ylabel="Fitness", title="Average Fitness Per Generation"
-    )
-
-    fig_rel_distance, ax_rel_distance = plt.subplots()
-    ax_rel_distance.set(
-        xlabel="Generation",
-        ylabel="Averaege Relative Distance",
-        title="Average Relative Distance Per Generation",
     )
 
     fig_abs_distance, ax_abs_distance = plt.subplots()
@@ -65,16 +93,57 @@ def plot_mean_results(GA: GeneticAlgorithmRunner):
     ax_fitness.plot(x, fitness, label=f"Mutation rate = {GA.mut_rate}")
     ax_collision.plot(x, collisions, label=f"Mutation rate = {GA.mut_rate}")
     ax_abs_distance.plot(x, abs_distance, label=f"Mutation rate = {GA.mut_rate}")
-    ax_rel_distance.plot(x, rel_distance, label=f"Mutation rate = {GA.mut_rate}")
     ax_token.plot(x, tokens, label=f"Mutation rate = {GA.mut_rate}")
 
     ax_fitness.legend()
     ax_collision.legend()
     ax_abs_distance.legend()
-    ax_rel_distance.legend()
     ax_token.legend()
     plt.show()
 
+def plot_best_results(GA: GeneticAlgorithmRunner):
+    x = range(0, GA.epochs)
+    fig_fitness, ax_fitness = plt.subplots()
+    ax_fitness.set(
+        xlabel="Generation", ylabel="Fitness", title="Best Fitness Per Generation"
+    )
+
+    fig_abs_distance, ax_abs_distance = plt.subplots()
+    ax_abs_distance.set(
+        xlabel="Generation",
+        ylabel="Absolute Distance",
+        title="Best Absolute Distance Per Generation",
+    )
+
+    fig_collision, ax_collision = plt.subplots()
+    ax_collision.set(
+        xlabel="Generation",
+        ylabel="Collisions",
+        title="Best Collision Per Generation",
+    )
+
+    fig_token, ax_token = plt.subplots()
+    ax_token.set(
+        xlabel="Generation",
+        ylabel="Tokens",
+        title="Tokens Per Generation",
+    )
+
+    fitness = [np.max(GA.results[key]["fitness"]) for key in GA.results]
+    collisions = [np.min(GA.results[key]["collisions"]) for key in GA.results]
+    abs_distance = [np.max(GA.results[key]["abs_dist"]) for key in GA.results]
+    tokens = [np.max(GA.results[key]["tokens"]) for key in GA.results]
+
+    ax_fitness.plot(x, fitness, label=f"Mutation rate = {GA.mut_rate}")
+    ax_collision.plot(x, collisions, label=f"Mutation rate = {GA.mut_rate}")
+    ax_abs_distance.plot(x, abs_distance, label=f"Mutation rate = {GA.mut_rate}")
+    ax_token.plot(x, tokens, label=f"Mutation rate = {GA.mut_rate}")
+
+    ax_fitness.legend()
+    ax_collision.legend()
+    ax_abs_distance.legend()
+    ax_token.legend()
+    plt.show()
 
 def plot_top_20_results(GA: GeneticAlgorithmRunner):
     x = range(0, GA.epochs)
@@ -141,4 +210,26 @@ def plot_top_20_results(GA: GeneticAlgorithmRunner):
     ax_abs_distance.legend()
     ax_rel_distance.legend()
     ax_token.legend()
+    plt.show()
+
+def plot_motorspeed_hist(GA:GeneticAlgorithmRunner):
+    fig,ax = plt.subplots()
+    for population in GA.all_populations:
+        data = np.array(GA.all_populations[population]).reshape(-1,32,2)
+        mean_representation = data.mean(axis=0)
+        right_motor_speed = mean_representation[:,0]
+        left_motor_speed = mean_representation[:,1]
+        ax.hist(left_motor_speed + right_motor_speed, label=f'Generation {population} ',alpha=0.7)
+    ax.legend()
+    plt.show()
+
+def plot_motorspeed(GA:GeneticAlgorithmRunner):
+    fig,ax = plt.subplots()
+    for population in GA.all_populations:
+        data = np.array(GA.all_populations[population]).reshape(-1,32,2)
+        mean_representation = data.mean(axis=0)
+        right_motor_speed = mean_representation[:,0]
+        left_motor_speed = mean_representation[:,1]
+        ax.plot(np.arange(0,32), left_motor_speed + right_motor_speed,label=f'Generation {population} rms',alpha=0.7)    
+    ax.legend()
     plt.show()

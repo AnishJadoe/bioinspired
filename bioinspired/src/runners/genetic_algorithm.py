@@ -1,6 +1,9 @@
-from functions import get_init_pop
-from run_simulation import run_simulation
+import os
+from ..world_map.txt_to_map import WorldMap
+from ..utility.functions import get_init_pop
+from ..utility.run_simulation import run_simulation
 import math
+import random
 import numpy as np
 import pickle
 
@@ -11,7 +14,7 @@ class GeneticAlgorithmRunner:
     parameters can be changed as needed
     """
 
-    def __init__(self, world_map, n_robots, epochs, run_time, cross_rate, mut_rate):
+    def __init__(self, n_robots, epochs, run_time, cross_rate, mut_rate):
         """Initialization of the class
 
         Args:
@@ -20,21 +23,19 @@ class GeneticAlgorithmRunner:
             cross_rate (float): The crossover rate of the crossover operator
             mut_rate (float): The mutation rate of the mutation operator
         """
-
-        self.world_map = world_map
         self.n_robots = n_robots
         self.epochs = epochs
         self.fitness = list()
         self.best_eval = 0
         self.pop = get_init_pop(self.n_robots)
         self.best_agent = self.pop[0]
-        self.gen = 0
+        self.gen = 1
         self.run_time = run_time
 
         self.cross_rate = cross_rate
         self.mut_rate = mut_rate
         self.clone = False
-
+        self.converged = False
         self.reward_gen = list()
         self.coll_gen = list()
         self.dist_gen = list()
@@ -44,7 +45,7 @@ class GeneticAlgorithmRunner:
         self.results = dict()
         self.all_populations = dict()
 
-    def selection(self):  # k=5
+    def best_fit_selection(self):  # k=5
         """The selection operator used for this algorithm, it takes the best 20%
         of the generation and seperates it from the bottom 80%
 
@@ -60,12 +61,38 @@ class GeneticAlgorithmRunner:
 
         other_pop = [self.pop[i] for i in other_index]
 
-        # selection_ix = np.random.randint(len(self.pop))
-        # for ix in np.random.randint(0, len(self.pop), k - 1):
-        #     if self.ls_rewards[ix] < self.ls_rewards[selection_ix]:
-        #         selection_ix = ix
-
         return best_pop, other_pop
+    
+    def tournament_selection(self, k=3):
+        selected = []
+        for _ in range(self.n_robots):
+            participants = random.sample(range(0,len(self.pop)-1),k)
+            fitnesses = [self.fitness[p] for p in participants]
+            selected.append(self.pop[participants[np.argmax(fitnesses)]])
+
+        return selected
+
+    def roulette_selection(self):
+        ls_p = []
+        if sum(self.fitness) == 0:
+            self.converged = True
+            return ls_p,ls_p
+        # Create "roullete wheel"
+        probabilities_wheel = self.fitness/sum(self.fitness)
+        cum_sum = [0]
+        for probability in probabilities_wheel:
+            cum_sum.append(cum_sum[-1]+probability)
+        cum_sum = np.array(cum_sum[1:])
+        # Select parents
+        for i in range(int(self.n_robots)):
+            spin = np.random.uniform(0, 1)
+            index_p = np.where(cum_sum>=spin)[0][0]
+            ls_p.append(self.pop[index_p])
+          
+
+        return ls_p + ls_p
+
+
 
     def mutation(self, individual):
         """This is the mutation operator of the genetic algorithm, it takes an
@@ -75,38 +102,27 @@ class GeneticAlgorithmRunner:
             individual (numpy array): The individual on which the mutation will be preformed
         """
         random_choice = np.random.sample()
-
         if self.mut_rate > random_choice:
-            unequal = True
+            idx1, idx2 = np.random.randint(0, individual.size, 2)
+            individual.flat[idx1], individual.flat[idx2] = individual.flat[idx2], individual.flat[idx1]
+        return individual
 
-            while unequal:
-                # Row and column to start the mutation swap with
-                random_row_s = np.random.randint(low=0, high=individual.shape[0])
-                random_column_s = np.random.randint(low=0, high=individual.shape[1])
-
-                # Row and column with which we want to swap the orginal data point with
-                random_row_e = np.random.randint(low=0, high=individual.shape[0])
-                random_column_e = np.random.randint(low=0, high=individual.shape[1])
-
-                if (random_row_s != random_row_e) or (
-                    random_column_s != random_column_e
-                ):
-                    # only if the rows or column are not the same we will swap the data points
-                    unequal = False
-
-            p_start = individual[random_row_s, random_column_s]
-            p_end = individual[random_row_e, random_column_e]
-
-            individual[random_row_s, random_column_s] = p_end
-            individual[random_row_e, random_column_e] = p_start
-
-        return
 
     def two_point_crossover(self, parent1, parent2):
         size_chromosome = len(parent1.flatten())
         random_choice = np.random.sample()
-        cross_point_1 = np.random.randint(low=0, high=size_chromosome)
-        cross_point_2 = np.random.randint(low=cross_point_1, high=size_chromosome)
+        roll_1 = np.random.randint(low=0, high=size_chromosome)
+        roll_2 = np.random.randint(low=0, high=size_chromosome)
+
+        if roll_2 > roll_1:
+            cross_point_1 = roll_1
+            cross_point_2 = roll_2
+        elif roll_1 > roll_2:
+            cross_point_1 = roll_2
+            cross_point_2 = roll_1
+        else:
+            cross_point_1 = roll_1
+            cross_point_2 = roll_2 + 1
 
         child1 = parent1.copy().flatten()
         child2 = parent2.copy().flatten()
@@ -124,53 +140,12 @@ class GeneticAlgorithmRunner:
             child1, child2 = parent1, parent2
 
         return [child1.reshape(parent1.shape), child2.reshape(parent2.shape)]
-
-    def crossover(self, parent1, parent2):
-        """The crossover operator of the algorithm, it takes 2 parent chromosomes and
-        uses either a horizontal (row) or vertical (column) method  for crossover
-
-        Args:
-            parent1 (numpy array): The first parent used for crossover
-            parent2 (numpy array): The second parent used for crossover
-
-        Returns:
-            [child1, child2] (list): A list containing both the first and second child
-            obtained after crossover
-        """
-
-        random_choice = np.random.sample()
-        random_row = np.random.randint(low=1, high=parent1.shape[0])
-        random_column = np.random.randint(low=1, high=parent1.shape[1])
-
-        empty_child1 = np.zeros(parent1.shape)
-        empty_child2 = np.zeros(parent1.shape)
-        self.clone = True
-
-        if self.cross_rate > random_choice:
-            self.clone = False
-
-            # Horizontal crossover
-            if random_choice > 0.5:
-                empty_child1[:random_row, :] = parent1[:random_row, :]
-                empty_child1[random_row:, :] = parent2[random_row:, :]
-                child1 = empty_child1
-
-                empty_child2[:random_row, :] = parent2[:random_row, :]
-                empty_child2[random_row:, :] = parent1[random_row:, :]
-                child2 = empty_child2
-            # Vertical crossover
-            else:
-                empty_child1[:, :random_column] = parent1[:, :random_column]
-                empty_child1[:, random_column:] = parent2[:, random_column:]
-                child1 = empty_child1
-
-                empty_child2[:, :random_column] = parent2[:, :random_column]
-                empty_child2[:, random_column:] = parent1[:, random_column:]
-                child2 = empty_child2
-        else:
-            child1, child2 = parent1, parent2
-
-        return [child1, child2]
+        
+    def add_best_individuals(self, children):
+        index = min(-1, -math.floor(self.n_robots * 0.10))  # take best 10%
+        elitst_children = np.argsort(np.array(self.fitness))[index:]
+        children.extend([self.pop[i] for i in elitst_children])
+        return children
 
     def run(self):
         """This is the main loop for the algorithm. First a base score is set-up by running the algorithm with the inital population
@@ -181,13 +156,15 @@ class GeneticAlgorithmRunner:
         Returns:
             [type]: [description]
         """
-
-        for gen in range(self.epochs):
-            print(f"GENERATION: {gen}")
+        for epoch in range(self.epochs):
+            print(f"GENERATION: {self.gen}")
             self._save_population()
+            # Build world
+            wm = WorldMap(skeleton_file="bioinspired\src\world_map\maps\H_map.txt", map_width=60, map_height=40, tile_size=15)
             population_results = run_simulation(
-                self.world_map, self.run_time, self.pop, self.n_robots
+                wm, self.run_time, self.pop, self.n_robots, self.gen
             )
+    
             self._save_results(population_results)
 
             self.fitness = population_results["pop_fitness"]
@@ -195,29 +172,22 @@ class GeneticAlgorithmRunner:
                 if self.fitness[i] > self.best_eval:
                     self.best_agent, self.best_eval = self.pop[i], self.fitness[i]
                     print(
-                        f"Generation {gen} gives a new best \
+                        f"Generation {self.gen} gives a new best \
                             with score {self.fitness[i]}"
                     )
 
-            ls_p1, ls_p2 = self.selection()
-
             children = list()
+            # elitism
+            children = self.add_best_individuals(children)
+            parents = self.tournament_selection()
+
             mating = True
             while mating:
-                random_parent1 = np.random.randint(0, len(ls_p1))
-                parent1 = ls_p1[random_parent1]
+                parent1_index = np.random.randint(0, len(parents))
+                parent2_index = np.random.randint(0, len(parents))
+                parent1 = parents[parent1_index]
+                parent2= parents[parent2_index]
                 flip = np.random.uniform(0, 1)
-
-                if flip > 0.6:
-                    # Let the parent mate with another parent from the top 20%
-
-                    random_parent2 = np.random.randint(0, len(ls_p1))
-                    parent2 = ls_p1[random_parent2]
-                else:
-                    # Let the parent mate with a parent from the bottom 80%
-
-                    random_parent2 = np.random.randint(0, len(ls_p2))
-                    parent2 = ls_p2[random_parent2]
 
                 for c in self.two_point_crossover(parent1, parent2):
                     self.mutation(c)
@@ -226,7 +196,7 @@ class GeneticAlgorithmRunner:
                 if len(children) >= self.n_robots:
                     mating = False
 
-            self.pop = children
+            self.pop = children[:self.n_robots+1]
             self.gen += 1
 
         return
@@ -247,9 +217,10 @@ class GeneticAlgorithmRunner:
 
         self.results[self.gen] = results_this_gen
 
-    def save_run(self, run_name):
+    def save_run(self, folder, run_name):
         self.world_map = []  # Can't save pygame surface
-        with open(run_name, "wb") as f:
+        os.makedirs(folder, exist_ok=True)
+        with open(f"{folder}/{run_name}", "wb") as f:
             pickle.dump(self, f)
 
     def best_gen(self):
