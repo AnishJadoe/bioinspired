@@ -19,6 +19,7 @@ class WorldMap:
         self.tokens = []
         self.start_pos = (0,0)
         self.movable_tiles = []
+        self.spatial_grid = [[[] for _ in range(self.map_height)] for _ in range(self.map_width)]
         
     def build_map(self):
         skeleton_file = self._load_skeleton_file()
@@ -27,7 +28,11 @@ class WorldMap:
             self.map_height*self.tile_size),
             display=0)
         self._parse_skeleton_file(skeleton_file)
-        
+    
+    def _add_obstacle(self, obstacle):
+        x, y = obstacle.x // self.tile_size, obstacle.y // self.tile_size
+        self.spatial_grid[int(x)][int(y)].append(obstacle)
+
     def _load_skeleton_file(self):
         return open(self.skeleton_file, "r")
     
@@ -45,6 +50,7 @@ class WorldMap:
                     self._draw_wall(obj)
                     self.walls.append(obj)
                     self.binary_map[x][y] = 1
+                    self._add_obstacle(obj)
                 if char == "T":
                     self._draw_token(obj)
                     self.tokens.append(obj)

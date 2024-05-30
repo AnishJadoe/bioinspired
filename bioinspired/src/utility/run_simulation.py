@@ -69,9 +69,10 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
         # Update frame by redrawing everything
         wm.update_map()
         for robot in ls_robots:
-            robot.find_obstacles(wm)
+            nearby_obstacles = robot.find_nearby_obstacles(wm)
+            robot.update_sensors(nearby_obstacles,wm)
             robot.get_tokens()
-            robot.move(robot.get_collision(wm), dt, auto=True)
+            robot.move(robot.get_collision(nearby_obstacles), dt, auto=True)
             robot.draw(wm.surf)
 
         draw_time(wm.surf, (pygame.time.get_ticks()- loadtime))

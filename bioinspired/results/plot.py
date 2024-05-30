@@ -1,4 +1,5 @@
 # Loading in functions
+from typing import List
 import matplotlib.pyplot as plt
 import numpy as np
 from src.runners.genetic_algorithm import GeneticAlgorithmRunner
@@ -56,8 +57,7 @@ def plot_diversity(GA:GeneticAlgorithmRunner):
     
     plt.show()
 
-def plot_mean_results(GA: GeneticAlgorithmRunner):
-    x = range(0, GA.epochs)
+def plot_mean_results(GAs: GeneticAlgorithmRunner):
     fig_fitness, ax_fitness = plt.subplots()
     ax_fitness.set(
         xlabel="Generation", ylabel="Fitness", title="Average Fitness Per Generation"
@@ -83,17 +83,19 @@ def plot_mean_results(GA: GeneticAlgorithmRunner):
         ylabel="Averaege Tokens",
         title="Average Token Per Generation",
     )
+    if type(GAs) != list:
+        GAs = [GAs]
+    for GA in GAs:
+        x = range(0, GA.epochs)
+        fitness = [np.mean(GA.results[key]["fitness"]) for key in GA.results]
+        collisions = [np.mean(GA.results[key]["collisions"]) for key in GA.results]
+        abs_distance = [np.mean(GA.results[key]["abs_dist"]) for key in GA.results]
+        tokens = [np.mean(GA.results[key]["tokens"]) for key in GA.results]
 
-    fitness = [np.mean(GA.results[key]["fitness"]) for key in GA.results]
-    collisions = [np.mean(GA.results[key]["collisions"]) for key in GA.results]
-    abs_distance = [np.mean(GA.results[key]["abs_dist"]) for key in GA.results]
-    rel_distance = [np.mean(GA.results[key]["rel_dist"]) for key in GA.results]
-    tokens = [np.mean(GA.results[key]["tokens"]) for key in GA.results]
-
-    ax_fitness.plot(x, fitness, label=f"Mutation rate = {GA.mut_rate}")
-    ax_collision.plot(x, collisions, label=f"Mutation rate = {GA.mut_rate}")
-    ax_abs_distance.plot(x, abs_distance, label=f"Mutation rate = {GA.mut_rate}")
-    ax_token.plot(x, tokens, label=f"Mutation rate = {GA.mut_rate}")
+        ax_fitness.plot(x, fitness, label=f"Mutation rate = {GA.mut_rate}")
+        ax_collision.plot(x, collisions, label=f"Mutation rate = {GA.mut_rate}")
+        ax_abs_distance.plot(x, abs_distance, label=f"Mutation rate = {GA.mut_rate}")
+        ax_token.plot(x, tokens, label=f"Mutation rate = {GA.mut_rate}")
 
     ax_fitness.legend()
     ax_collision.legend()
@@ -101,8 +103,90 @@ def plot_mean_results(GA: GeneticAlgorithmRunner):
     ax_token.legend()
     plt.show()
 
-def plot_best_results(GA: GeneticAlgorithmRunner):
-    x = range(0, GA.epochs)
+def plot_aggregate_results(GAs: List[GeneticAlgorithmRunner]):
+    fig_fitness, ax_fitness = plt.subplots()
+    ax_fitness.set(
+        xlabel="Generation", ylabel="Fitness", title="Average Fitness Per Generation"
+    )
+
+    fig_abs_distance, ax_abs_distance = plt.subplots()
+    ax_abs_distance.set(
+        xlabel="Generation",
+        ylabel="Averaege Absolute Distance",
+        title="Average Absolute Distance Per Generation",
+    )
+
+    fig_collision, ax_collision = plt.subplots()
+    ax_collision.set(
+        xlabel="Generation",
+        ylabel="Averaege Collisions",
+        title="Average Collision Per Generation",
+    )
+
+    fig_token, ax_token = plt.subplots()
+    ax_token.set(
+        xlabel="Generation",
+        ylabel="Averaege Tokens",
+        title="Average Token Per Generation",
+    )
+    if type(GAs) != list:
+        GAs = [GAs]
+    
+    aggregate_fitness = {} # Data structure to agglomorate the results
+    aggregate_collisions = {} # Data structure to agglomorate the results
+    aggregate_abs_distance = {} # Data structure to agglomorate the results
+    aggregate_tokens = {} # Data structure to agglomorate the results
+    for GA in GAs:
+        x = range(0, GA.epochs)
+        if not GA.mut_rate in aggregate_fitness:
+            aggregate_fitness[GA.mut_rate] = np.zeros((1,30))
+            aggregate_collisions[GA.mut_rate] = np.zeros((1,30))
+            aggregate_abs_distance[GA.mut_rate] = np.zeros((1,30))
+            aggregate_tokens[GA.mut_rate] = np.zeros((1,30))
+            
+        fitness = [np.mean(GA.results[key]["fitness"]) for key in GA.results]
+        collisions = [np.mean(GA.results[key]["collisions"]) for key in GA.results]
+        abs_distance = [np.mean(GA.results[key]["abs_dist"]) for key in GA.results]
+        tokens = [np.mean(GA.results[key]["tokens"]) for key in GA.results]
+
+        aggregate_fitness[GA.mut_rate] = np.vstack((aggregate_fitness[GA.mut_rate],fitness))
+        aggregate_collisions[GA.mut_rate] = np.vstack((aggregate_collisions[GA.mut_rate],collisions))
+        aggregate_abs_distance[GA.mut_rate] = np.vstack((aggregate_abs_distance[GA.mut_rate],abs_distance))
+        aggregate_tokens[GA.mut_rate] = np.vstack((aggregate_tokens[GA.mut_rate],tokens))
+
+
+    for mut_rate in aggregate_fitness:
+        fitness = aggregate_fitness[mut_rate][1:,:].mean(axis=0)
+        fitness_std = aggregate_fitness[mut_rate][1:,:].std(axis=0)
+
+        collisions = aggregate_collisions[mut_rate][1:,:].mean(axis=0)
+        collisions_std = aggregate_collisions[mut_rate][1:,:].std(axis=0)
+
+        abs_distance = aggregate_abs_distance[mut_rate][1:,:].mean(axis=0)
+        abs_distance_std = aggregate_abs_distance[mut_rate][1:,:].std(axis=0)
+
+        tokens = aggregate_tokens[mut_rate][1:,:].mean(axis=0)
+        tokens_std = aggregate_tokens[mut_rate][1:,:].std(axis=0)
+
+        ax_fitness.plot(x, fitness, label=f"Mutation rate = {mut_rate}")
+        ax_fitness.fill_between(x, fitness-fitness_std, fitness+fitness_std ,alpha=0.3)
+        
+        ax_collision.plot(x, collisions, label=f"Mutation rate = {mut_rate}")
+        ax_collision.fill_between(x, collisions-collisions_std, collisions+collisions_std ,alpha=0.3)
+
+        ax_abs_distance.plot(x, abs_distance, label=f"Mutation rate = {mut_rate}")
+        ax_abs_distance.fill_between(x, abs_distance-abs_distance_std, abs_distance+abs_distance_std ,alpha=0.3)
+
+        ax_token.plot(x, tokens, label=f"Mutation rate = {mut_rate}")
+        ax_token.fill_between(x, tokens-tokens_std, tokens+tokens_std ,alpha=0.3)
+
+    ax_fitness.legend()
+    ax_collision.legend()
+    ax_abs_distance.legend()
+    ax_token.legend()
+    plt.show()
+
+def plot_best_results(GAs: List[GeneticAlgorithmRunner]):
     fig_fitness, ax_fitness = plt.subplots()
     ax_fitness.set(
         xlabel="Generation", ylabel="Fitness", title="Best Fitness Per Generation"
@@ -128,16 +212,20 @@ def plot_best_results(GA: GeneticAlgorithmRunner):
         ylabel="Tokens",
         title="Tokens Per Generation",
     )
+    if type(GAs) != list:
+        GAs = [GAs]
 
-    fitness = [np.max(GA.results[key]["fitness"]) for key in GA.results]
-    collisions = [np.min(GA.results[key]["collisions"]) for key in GA.results]
-    abs_distance = [np.max(GA.results[key]["abs_dist"]) for key in GA.results]
-    tokens = [np.max(GA.results[key]["tokens"]) for key in GA.results]
+    for GA in GAs:
+        x = range(0, GA.epochs)
+        fitness = [np.max(GA.results[key]["fitness"]) for key in GA.results]
+        collisions = [np.min(GA.results[key]["collisions"]) for key in GA.results]
+        abs_distance = [np.max(GA.results[key]["abs_dist"]) for key in GA.results]
+        tokens = [np.max(GA.results[key]["tokens"]) for key in GA.results]
 
-    ax_fitness.plot(x, fitness, label=f"Mutation rate = {GA.mut_rate}")
-    ax_collision.plot(x, collisions, label=f"Mutation rate = {GA.mut_rate}")
-    ax_abs_distance.plot(x, abs_distance, label=f"Mutation rate = {GA.mut_rate}")
-    ax_token.plot(x, tokens, label=f"Mutation rate = {GA.mut_rate}")
+        ax_fitness.plot(x, fitness, label=f"Mutation rate = {GA.mut_rate}")
+        ax_collision.plot(x, collisions, label=f"Mutation rate = {GA.mut_rate}")
+        ax_abs_distance.plot(x, abs_distance, label=f"Mutation rate = {GA.mut_rate}")
+        ax_token.plot(x, tokens, label=f"Mutation rate = {GA.mut_rate}")
 
     ax_fitness.legend()
     ax_collision.legend()

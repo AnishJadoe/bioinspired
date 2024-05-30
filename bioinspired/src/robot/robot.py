@@ -1,11 +1,19 @@
 import numpy as np
 import pygame
 import math
+
+from ..utility.functions import calc_angle, calc_distance
 from ..world_map.txt_to_map import WorldMap
 from ..utility.constants import *
 
-WHITE = (255,255,255,0)
-RED = (255,0,0)
+WHITE = (255,255,255,128)
+DARK_GREEN = (0, 255, 0)
+RED = (255, 0, 0)
+PURPLE = (128, 0, 128)
+BLUE = (0, 0, 255)
+BROWN = (139, 69, 19)
+ORANGE = (255, 165, 0)
+SENSOR_COLORS = [RED,DARK_GREEN,PURPLE,ORANGE,BLUE]
 
 def find_closest_cell(agent_location, movable_cells):
     # Extract the coordinates of the agent's location
@@ -33,6 +41,7 @@ def find_closest_cell(agent_location, movable_cells):
 class Robot:
     def __init__(self,  startpos, width, chromosome, token_locations, special_flag,robot_id=1):
         self.id = robot_id + 1
+        self.chromosome = chromosome
         self.m2p = 3779.52  # meters 2 pixels
         self.w = width * 20
         self.tokens_locations = token_locations
@@ -42,8 +51,8 @@ class Robot:
         self.y = startpos[1]
         self.current_tile = 0
         self.theta = 0
-        self.vl = 1
-        self.vr = 1
+        self.vl = 0
+        self.vr = 0
         self.maxspeed = 255
         self.minspeed = -255
         self.all_states = np.array(np.meshgrid([0, 1],[0,1],[0,1],[0,1],[0,1])).T.reshape(-1, 5)
@@ -54,12 +63,11 @@ class Robot:
         self.ls_x = []
         self.ls_y = []
         self.omega = 0
-        self.sensor_spacing = [-8,-3,0,3,8]
+        self.sensor_spacing = [0, 30, 60, -30, -60]
+
 
         self.dist_travelled = 0
         self.avg_dist = 0
-
-
         self.sensor = [
             0,
             0,
@@ -75,6 +83,7 @@ class Robot:
         self.token = 0
         self.special = special_flag
 
+        # Build robot images
         if self.special:
             self.base_img = pygame.image.load(r"bioinspired\src\robot\images\robot_special.png")
             self.base_img = pygame.transform.scale(self.base_img, (self.width, self.length))
@@ -84,27 +93,33 @@ class Robot:
             self.base_img = pygame.transform.scale(self.base_img, (self.width, self.length))
             self.base_img = pygame.transform.rotate(self.base_img, 0)
         
-        self.sensor_on_img = pygame.image.load(r"bioinspired\src\robot\images\distance_sensor_on.png")
-        self.sensor_on_img = pygame.transform.scale(self.sensor_on_img,(30,80))
-
-        self.sensor_off_img = pygame.image.load(r"bioinspired\src\robot\images\distance_sensor_off.png")
-        self.sensor_off_img = pygame.transform.scale(self.sensor_off_img,(30,80))
-
         self.trans_img = self.base_img
         self.hitbox = self.trans_img.get_rect(center=(self.x, self.y))
-        self.chromosome = chromosome
+        
+        # Initialize sensor image 
+        self.sensor_on_img = pygame.image.load(r"bioinspired\src\robot\images\distance_sensor_on.png")
+        self.sensor_off_img = pygame.image.load(r"bioinspired\src\robot\images\distance_sensor_off.png")
+        self.sensor_on_img = pygame.transform.scale(self.sensor_on_img,(20,100))
+        self.sensor_off_img = pygame.transform.scale(self.sensor_off_img,(20,100))
+
+        self.sensor_imgs = []
+        self.sensor_hitboxes = []
+        for i in range(5):
+            self.sensor_imgs.append(pygame.transform.rotate(self.sensor_off_img, self.sensor_spacing[i]))
+            self.sensor_hitboxes.append(self.sensor_imgs[i].get_rect(center=(self.x, self.y)))
 
     def draw_sensor(self,world):
-        for i,sensor in enumerate(self.sensor[1:]):
+        for i,sensor in enumerate(self.sensor[1:2]):
+            rotation = self.sensor_spacing[i] #+ math.degrees(self.theta)
             if sensor:  
-                sensor_range = 40
-                color = (255,128,0,120)
-                start_point = (self.x,self.y)
-                sensors = [pygame.draw.line(world,color,start_point, 
-                                    (self.x+math.cos(self.sensor_spacing[i]-self.theta)*sensor_range,
-                            self.y+math.sin(self.sensor_spacing[i]-self.theta)*sensor_range), width=3)]
+                self.sensor_imgs[i] = pygame.transform.rotozoom(self.sensor_on_img,rotation , 1)
             else:
-                pass
+                self.sensor_imgs[i] = pygame.transform.rotozoom(self.sensor_off_img,rotation, 1)
+
+            self.sensor_hitboxes[i] = self.sensor_imgs[i].get_rect(center=(500, 250))
+            pygame.draw.rect(world,RED,self.sensor_hitboxes[i], width=1)
+
+            world.blit(self.sensor_imgs[i], self.sensor_hitboxes[i])
   
     def debug_theta(self,world):
         font = pygame.font.SysFont(None, 24)
@@ -123,44 +138,66 @@ class Robot:
         self.hitbox = self.trans_img.get_rect(center=(self.x, self.y))
         world.blit(self.trans_img, self.hitbox)
 
+    def draw_robot_bb(self,world):
+        pygame.draw.rect(world,RED,self.hitbox, width=1)
+        
     def draw(self, world):
         '''
         Draws on the world
         '''
         self.draw_robot(world)
+        # self.draw_robot_bb(world)
         #self.debug_token(world)
         #self.draw_sensor(world)
         # self.debug_theta(world)
 
+    # def update_sensors(self, nearby_obstacles, world_map):
+    #         self.sensor = [0, 0, 0, 0, 0, 0]
+    #         sensor_range = 45
+
+    #         for obstacle in nearby_obstacles:
+    #             dist_to_wall = calc_distance((self.x, self.y), (obstacle.x, obstacle.y))
+    #             if dist_to_wall <= sensor_range:
+    #                 angle_w_wall = calc_angle((self.x, self.y), (obstacle.x, obstacle.y))
+    #                 relative_angle = (angle_w_wall - self.theta) % (2 * math.pi)
+
+    #                 for i, sensor_angle in enumerate(self.sensor_spacing):
+    #                     sensor_start = (sensor_angle - 22.5) * (math.pi / 180)
+    #                     sensor_end = (sensor_angle + 22.5) * (math.pi / 180)
+    #                     if sensor_start <= relative_angle < sensor_end:
+    #                         pygame.draw.line(world_map.surf, SENSOR_COLORS[i], (self.x, self.y), (self.x+math.cos(sensor_angle-self.theta)*sensor_range,
+    #                         self.y+math.sin(sensor_angle-self.theta)*sensor_range),width=5)
+    #                         self.sensor[i + 1] = 1
+    #                         break
+
+    #         return
     
-    def find_obstacles(self, world_map:WorldMap):
+        
+    def update_sensors(self, nearby_obstacles, world_map:WorldMap):
         self.sensor = [0, 0, 0, 0, 0, 0]
-        sensor_range = 60
-        color = WHITE
+        sensor_range = 30
         start_point = (self.x,self.y)
-        sensors = [pygame.draw.line(world_map.surf,color,start_point, 
+        sensors = [pygame.draw.line(world_map.surf,BLUE,start_point, 
                             (self.x+math.cos(spacing-self.theta)*sensor_range,
                             self.y+math.sin(spacing-self.theta)*sensor_range), width=1) for spacing in self.sensor_spacing]
         
         for i in range(len(self.sensor)-1):
-            walls_near = sensors[i].collidelist(world_map.walls)
+            walls_near = sensors[i].collidelist(nearby_obstacles)
             if walls_near > 0:
                 self.sensor[i+1] = 1
         return
      
-    def get_collision(self, world_map: WorldMap):
+
+    def get_collision(self, nearby_obstacles):
         """Function to calculate whetere collisions between the walls and the agent have occured
         """
         NO_COLLISIONS = -1
-        # Just to check if there are even obstacles near
-        if max(self.sensor) < 1:
-            return 0 
-        
-        collided_walls = self.hitbox.collidelist(world_map.walls)
+
+        collided_walls = self.hitbox.collidelist(nearby_obstacles)
         if collided_walls != NO_COLLISIONS: # -1 equals no collision:
             self.collision += 1
             self.sensor[0] = 1
-            return world_map.walls[collided_walls]
+            return nearby_obstacles[collided_walls]
         else:
             return 0
         
@@ -267,15 +304,17 @@ class Robot:
         return
     
     def get_reward(self):
-        return ((self.dist_travelled/self.m2p) * (1+self.token) - self.collision/100)
-          
-    def get_FOV(self, map):
-        FOV_size = 2
-        current_pos_x = int(self.x/20)
-        current_pos_y = int(self.y/20)
-        FOV = map.binary_map[current_pos_x-FOV_size : current_pos_x+FOV_size+1, current_pos_y-FOV_size : current_pos_y+FOV_size+1]
-        if FOV.shape != (5,5):
-            FOV = np.ones((7,7))
-        return FOV
+        return ((self.dist_travelled/self.m2p) * (1+self.token) - self.collision/50)
+    
+    def find_nearby_obstacles(self,world_map:WorldMap):
+        nearby_obstacles = []
+        cell_x = int(self.x // world_map.tile_size)
+        cell_y = int(self.y // world_map.tile_size)
+        for i in range(max(0, cell_x - 3), min(world_map.map_width, cell_x + 4)):
+            for j in range(max(0, cell_y - 3), min(world_map.map_height, cell_y + 4)):
+                if world_map.binary_map[i][j] == 1:
+                    nearby_obstacles.extend(world_map.spatial_grid[i][j])
+        return nearby_obstacles
+
 
         
