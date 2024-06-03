@@ -212,6 +212,7 @@ class GeneticAlgorithmRunner:
         results_this_gen["rel_dist"] = population_results["pop_rel_distance"]
         results_this_gen["collisions"] = population_results["pop_collisions"]
         results_this_gen["tokens"] = population_results["pop_token"]
+        results_this_gen["cells_explored"] = population_results["pop_cells_explored"]
         results_this_gen["best_eval"] = self.best_eval
         results_this_gen["best_agent"] = self.best_agent
 

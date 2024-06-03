@@ -6,12 +6,13 @@ are made of the given paremeters
 import numpy as np
 from src.runners.genetic_algorithm import GeneticAlgorithmRunner
 
-seeds = [30,42,50,75]
-epochs = 30
-time = 60000
-n_robots = 250
+# seeds = [30,42,50,70,80,100]
+seeds = [30]
+epochs = 50
+time = 90* 1000 # milliseconds
+n_robots = 160
 ls_cross_rate = [1]
-ls_mut_rate = [1,0.9,0.8]
+ls_mut_rate = [0.6]
 
 for seed in seeds:
     np.random.seed(seed)

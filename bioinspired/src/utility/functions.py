@@ -1,8 +1,19 @@
 import numpy as np
 import math
+import pickle
+import os
 
 ################ FUNCTIONS ################
 
+def load_GAs(GAs, folder):
+    for file in os.scandir(folder):
+        if os.path.isdir(file):
+            load_GAs(GAs, file)
+        else:
+            with open(file, "rb") as f:
+                GA = pickle.load(f)
+                GAs.append(GA)
+    return GAs
 
 def get_init_pop(n_robots):
     """Generate the initial population to run the algorithm with
@@ -19,7 +30,7 @@ def get_init_pop(n_robots):
     # with differing mutation parameters
 
     for i in range(0, n_robots):
-        population.append(np.random.randint(low=-255, high=255, size=(32, 2)))
+        population.append(np.random.randint(low=-255, high=255, size=(64, 2)))
     return population
 
 

@@ -70,6 +70,13 @@ def plot_mean_results(GAs: GeneticAlgorithmRunner):
         title="Average Absolute Distance Per Generation",
     )
 
+    fig_cells_explored, ax_cells_explored = plt.subplots()
+    ax_cells_explored.set(
+        xlabel="Generation",
+        ylabel="Averaege Cells Explored",
+        title="Average Cells Explored Per Generation",
+    )
+
     fig_collision, ax_collision = plt.subplots()
     ax_collision.set(
         xlabel="Generation",
@@ -91,16 +98,19 @@ def plot_mean_results(GAs: GeneticAlgorithmRunner):
         collisions = [np.mean(GA.results[key]["collisions"]) for key in GA.results]
         abs_distance = [np.mean(GA.results[key]["abs_dist"]) for key in GA.results]
         tokens = [np.mean(GA.results[key]["tokens"]) for key in GA.results]
+        cells_explored = [np.mean(GA.results[key]["cells_explored"]) for key in GA.results]
 
         ax_fitness.plot(x, fitness, label=f"Mutation rate = {GA.mut_rate}")
         ax_collision.plot(x, collisions, label=f"Mutation rate = {GA.mut_rate}")
         ax_abs_distance.plot(x, abs_distance, label=f"Mutation rate = {GA.mut_rate}")
         ax_token.plot(x, tokens, label=f"Mutation rate = {GA.mut_rate}")
+        ax_cells_explored.plot(x, cells_explored, label=f"Mutation rate = {GA.mut_rate}")
 
     ax_fitness.legend()
     ax_collision.legend()
     ax_abs_distance.legend()
     ax_token.legend()
+    ax_cells_explored.legend()
     plt.show()
 
 def plot_aggregate_results(GAs: List[GeneticAlgorithmRunner]):
@@ -139,10 +149,10 @@ def plot_aggregate_results(GAs: List[GeneticAlgorithmRunner]):
     for GA in GAs:
         x = range(0, GA.epochs)
         if not GA.mut_rate in aggregate_fitness:
-            aggregate_fitness[GA.mut_rate] = np.zeros((1,30))
-            aggregate_collisions[GA.mut_rate] = np.zeros((1,30))
-            aggregate_abs_distance[GA.mut_rate] = np.zeros((1,30))
-            aggregate_tokens[GA.mut_rate] = np.zeros((1,30))
+            aggregate_fitness[GA.mut_rate] = np.zeros((1,GA.epochs))
+            aggregate_collisions[GA.mut_rate] = np.zeros((1,GA.epochs))
+            aggregate_abs_distance[GA.mut_rate] = np.zeros((1,GA.epochs))
+            aggregate_tokens[GA.mut_rate] = np.zeros((1,GA.epochs))
             
         fitness = [np.mean(GA.results[key]["fitness"]) for key in GA.results]
         collisions = [np.mean(GA.results[key]["collisions"]) for key in GA.results]
