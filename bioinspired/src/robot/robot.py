@@ -79,8 +79,8 @@ class Robot:
             0,
             0,
         ]  # 1 tactile sensor (sensor[0]) and 5 ultrasound
-        self.sensor_range = 70
-        self.sensor_sweep = 15 # degrees
+        self.sensor_range = 45
+        self.sensor_sweep = 25 # degrees
         self.width = width 
         self.length = width 
         self.collision = 0
@@ -168,13 +168,12 @@ class Robot:
         world.blit(img,(self.x,self.y))  
 
     def draw_robot(self,world, debug=False):
-        font = pygame.font.SysFont(None, 24)
         self.trans_img = pygame.transform.rotozoom(self.base_img,
                                                  math.degrees(-self.theta), 1)
         self.hitbox = self.trans_img.get_rect(center=(self.x, self.y))
-        img = font.render(f'ID: {self.id}', True, (0,0,0))
-        world.blit(img,(self.x,self.y-20))    
         world.blit(self.trans_img, self.hitbox)
+        # img = font.render(f'ID: {self.id}', True, (0,0,0))
+        # world.blit(img,(self.x,self.y-20))    
 
     def draw_robot_bb(self,world):
         pygame.draw.rect(world,RED,self.hitbox, width=1)
@@ -187,8 +186,8 @@ class Robot:
         # self.draw_visited_cells(world)
         # self.draw_robot_bb(world)
         #self.debug_token(world)
-        self.draw_sensor_orientation(world)
-        self.draw_sensor_activation(world)
+        # self.draw_sensor_orientation(world)
+        # self.draw_sensor_activation(world)
         # self.debug_theta(world)
         # self.draw_token(world)
 
@@ -204,31 +203,15 @@ class Robot:
                     relative_angle = calc_angle(v1,v2)
 
                     for i, sensor_angle in enumerate(self.sensor_spacing):
-            
                         sensor_start = (sensor_angle - self.sensor_sweep)
                         sensor_end = (sensor_angle + self.sensor_sweep) 
                         if sensor_start <= math.degrees(relative_angle) < sensor_end:
-                            # pygame.draw.rect(world_map.surf, SENSOR_COLORS[i], obstacle)
-                            # pygame.draw.line(world_map.surf,SENSOR_COLORS[i],(self.x,self.y),(obstacle.x,obstacle.y), width=3)
+                            pygame.draw.rect(world_map.surf, SENSOR_COLORS[i], obstacle)
+                            pygame.draw.line(world_map.surf,SENSOR_COLORS[i],(self.x,self.y),(obstacle.x,obstacle.y), width=3)
                             self.sensor[i + 1] = 1
                             break
                             
-            return
-    
-        
-    # def update_sensors(self, nearby_obstacles, world_map:WorldMap):
-    #     self.sensor = [0, 0, 0, 0, 0, 0]
-    #     start_point = (self.x,self.y)
-    #     sensors = [pygame.draw.line(world_map.surf,PURPLE,start_point, 
-    #                         (self.x+math.cos(self.theta-math.radians(spacing))*self.sensor_range,
-    #                         self.y+math.sin(self.theta-math.radians(spacing))*self.sensor_range), width=3) for spacing in self.sensor_spacing]
-        
-    #     for i in range(len(self.sensor)-1):
-    #         walls_near = sensors[i].collidelist(nearby_obstacles)
-    #         if walls_near > 0:
-    #             self.sensor[i+1] = 1
-    #     return
-     
+            return 
 
     def get_collision(self, nearby_obstacles):
         """Function to calculate whetere collisions between the walls and the agent have occured
