@@ -4,7 +4,7 @@ from src.runners.genetic_algorithm import GeneticAlgorithmRunner
 from src.utility.run_simulation import single_agent_run
 from src.utility.functions import load_GAs
 
-FOLDER = r"saved_runs\n_robots_160"
+FOLDER = r"saved_runs\n_robots_150\epochs_20"
 wm = WorldMap(skeleton_file="bioinspired\src\world_map\maps\H_map.txt", map_width=60, map_height=40, tile_size=15)
 
 GAs = []

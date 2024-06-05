@@ -49,7 +49,7 @@ def calc_distance(coord1, coord2):
     return dist
 
 
-def calc_angle(coord1, coord2):
+def calc_angle(v1, v2):
     """Calculate the orientation of 2 points with respect to eachother
 
     Args:
@@ -59,10 +59,21 @@ def calc_angle(coord1, coord2):
     Returns:
         orient (float)
     """
-    if coord1[0] == coord2[0]:
-        # If the points are at the same location there is no angle
-        orient = 0
-    else:
-        orient = math.tan((coord1[1] - coord2[1]) / (coord1[0] - coord2[0]))
+
+    # normalize both direction vectors
+    v1 = v1 / np.linalg.norm(v1)
+    v2 = v2 / np.linalg.norm(v2)
+    orient = math.acos(np.dot(v1,v2))
+    sign = np.cross(v1,v2)
+    if sign < 0:
+        orient *= -1
+    if sign > 0:
+            orient *= 1
+    if sign == 0:
+        if sign == -1:
+            orient = math.pi
+        else:
+            orient = 0
+
 
     return orient

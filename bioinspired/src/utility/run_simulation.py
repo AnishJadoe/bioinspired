@@ -63,9 +63,13 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
     lasttime = pygame.time.get_ticks()
     loadtime = lasttime
     print(f"Loading took: {loadtime/1000} seconds")
+    running = True
     # Simulation loop
-    while pygame.time.get_ticks() <= (time+loadtime):
+    while pygame.time.get_ticks() <= (time+loadtime) and running:
         clock.tick(20)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
         dt = (pygame.time.get_ticks() - lasttime) / 1000
 
         # Update frame by redrawing everything

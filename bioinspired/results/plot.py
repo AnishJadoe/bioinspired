@@ -100,6 +100,7 @@ def plot_mean_results(GAs: GeneticAlgorithmRunner):
         tokens = [np.mean(GA.results[key]["tokens"]) for key in GA.results]
         cells_explored = [np.mean(GA.results[key]["cells_explored"]) for key in GA.results]
 
+        ax_fitness.hlines(max(fitness), 0,GA.epochs)
         ax_fitness.plot(x, fitness, label=f"Mutation rate = {GA.mut_rate}")
         ax_collision.plot(x, collisions, label=f"Mutation rate = {GA.mut_rate}")
         ax_abs_distance.plot(x, abs_distance, label=f"Mutation rate = {GA.mut_rate}")
@@ -202,6 +203,13 @@ def plot_best_results(GAs: List[GeneticAlgorithmRunner]):
         xlabel="Generation", ylabel="Fitness", title="Best Fitness Per Generation"
     )
 
+    fig_cells_explored, ax_cells_explored = plt.subplots()
+    ax_cells_explored.set(
+        xlabel="Generation",
+        ylabel="Most Cells Explored",
+        title="Most Cells Explored in Generation",
+    )
+
     fig_abs_distance, ax_abs_distance = plt.subplots()
     ax_abs_distance.set(
         xlabel="Generation",
@@ -225,22 +233,27 @@ def plot_best_results(GAs: List[GeneticAlgorithmRunner]):
     if type(GAs) != list:
         GAs = [GAs]
 
+    m2p =  3779.52
     for GA in GAs:
         x = range(0, GA.epochs)
         fitness = [np.max(GA.results[key]["fitness"]) for key in GA.results]
         collisions = [np.min(GA.results[key]["collisions"]) for key in GA.results]
-        abs_distance = [np.max(GA.results[key]["abs_dist"]) for key in GA.results]
+        abs_distance = [np.max(GA.results[key]["abs_dist"] ) / m2p for key in GA.results]
         tokens = [np.max(GA.results[key]["tokens"]) for key in GA.results]
+        cells_explored = [np.max(GA.results[key]["cells_explored"]) for key in GA.results]
+
 
         ax_fitness.plot(x, fitness, label=f"Mutation rate = {GA.mut_rate}")
-        ax_collision.plot(x, collisions, label=f"Mutation rate = {GA.mut_rate}")
         ax_abs_distance.plot(x, abs_distance, label=f"Mutation rate = {GA.mut_rate}")
+        ax_collision.plot(x, collisions, label=f"Mutation rate = {GA.mut_rate}")
+        ax_cells_explored.plot(x, cells_explored, label=f"Mutation rate = {GA.mut_rate}")
         ax_token.plot(x, tokens, label=f"Mutation rate = {GA.mut_rate}")
 
     ax_fitness.legend()
     ax_collision.legend()
     ax_abs_distance.legend()
     ax_token.legend()
+    ax_cells_explored.legend()
     plt.show()
 
 def plot_top_20_results(GA: GeneticAlgorithmRunner):

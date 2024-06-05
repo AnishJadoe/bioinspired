@@ -79,8 +79,8 @@ class Robot:
             0,
             0,
         ]  # 1 tactile sensor (sensor[0]) and 5 ultrasound
-        self.sensor_range = 30
-        self.sensor_sweep = 10 # degrees
+        self.sensor_range = 70
+        self.sensor_sweep = 15 # degrees
         self.width = width 
         self.length = width 
         self.collision = 0
@@ -106,45 +106,47 @@ class Robot:
         self.sensor_on_img = pygame.transform.scale(self.sensor_on_img,(20,100))
         self.sensor_off_img = pygame.transform.scale(self.sensor_off_img,(20,100))
 
+    def _attitude(self):
+        return(self.x,self.y,math.degrees(self.theta))
     def draw_sensor_orientation(self,world):
         for i,sensor in enumerate(self.sensor[1:]):
             sensor_angle = self.sensor_spacing[i]
             pygame.draw.line(world, SENSOR_COLORS[i], (self.x, self.y), 
-            (self.x+math.cos(self.theta- math.radians(sensor_angle))*self.sensor_range,
-            self.y+math.sin(self.theta- math.radians(sensor_angle))*self.sensor_range),width=2)
+            (self.x+math.cos(self.theta+math.radians(sensor_angle))*self.sensor_range,
+            self.y+math.sin(self.theta+math.radians(sensor_angle))*self.sensor_range),width=2)
 
             pygame.draw.line(world, SENSOR_COLORS[i], (self.x, self.y), 
-            (self.x+math.cos(self.theta-math.radians(sensor_angle + self.sensor_sweep))*self.sensor_range,
-            self.y+math.sin(self.theta-math.radians(sensor_angle + self.sensor_sweep))*self.sensor_range),width=2)
+            (self.x+math.cos(self.theta+math.radians(sensor_angle + self.sensor_sweep))*self.sensor_range,
+            self.y+math.sin(self.theta+math.radians(sensor_angle + self.sensor_sweep))*self.sensor_range),width=2)
 
             pygame.draw.line(world, SENSOR_COLORS[i], (self.x, self.y), 
-            (self.x+math.cos(self.theta-math.radians(sensor_angle - self.sensor_sweep))*self.sensor_range,
-            self.y+math.sin(self.theta-math.radians(sensor_angle - self.sensor_sweep))*self.sensor_range),width=2)
+            (self.x+math.cos(self.theta+math.radians(sensor_angle - self.sensor_sweep))*self.sensor_range,
+            self.y+math.sin(self.theta+math.radians(sensor_angle - self.sensor_sweep))*self.sensor_range),width=2)
 
     def draw_sensor_activation(self,world):
         for i,sensor in enumerate(self.sensor[1:]):
             if sensor:
                 sensor_angle = self.sensor_spacing[i]
                 pygame.draw.line(world, SENSOR_COLORS[i], (self.x, self.y), 
-                (self.x+math.cos(self.theta- math.radians(sensor_angle))*self.sensor_range,
-                self.y+math.sin(self.theta- math.radians(sensor_angle))*self.sensor_range),width=6)
+                (self.x+math.cos(self.theta+math.radians(sensor_angle))*self.sensor_range,
+                self.y+math.sin(self.theta+math.radians(sensor_angle))*self.sensor_range),width=6)
 
                 pygame.draw.line(world, SENSOR_COLORS[i], (self.x, self.y), 
-                (self.x+math.cos(self.theta-math.radians(sensor_angle + self.sensor_sweep))*self.sensor_range,
-                self.y+math.sin(self.theta-math.radians(sensor_angle + self.sensor_sweep))*self.sensor_range),width=6)
+                (self.x+math.cos(self.theta+math.radians(sensor_angle + self.sensor_sweep))*self.sensor_range,
+                self.y+math.sin(self.theta+math.radians(sensor_angle + self.sensor_sweep))*self.sensor_range),width=6)
 
                 pygame.draw.line(world, SENSOR_COLORS[i], (self.x, self.y), 
-                (self.x+math.cos(self.theta-math.radians(sensor_angle - self.sensor_sweep))*self.sensor_range,
-                self.y+math.sin(self.theta-math.radians(sensor_angle - self.sensor_sweep))*self.sensor_range),width=6)
+                (self.x+math.cos(self.theta+math.radians(sensor_angle - self.sensor_sweep))*self.sensor_range,
+                self.y+math.sin(self.theta+math.radians(sensor_angle - self.sensor_sweep))*self.sensor_range),width=6)
 
     def debug_theta(self,world):
         font = pygame.font.SysFont(None, 24)
         img = font.render(f'theta: {round(math.degrees(self.theta),1)}', True, (0,0,0))
         world.blit(img,(self.x,self.y))
-        img = font.render(f'vr: {round(self.vr,2)}' , True, (0,0,0))
-        world.blit(img,(400,300))
-        img = font.render(f'vl: {round(self.vl,2)}', True, (0,0,0))
-        world.blit(img,(400,200))
+        # img = font.render(f'vr: {round(self.vr,2)}' , True, (0,0,0))
+        # world.blit(img,(400,300))
+        # img = font.render(f'vl: {round(self.vl,2)}', True, (0,0,0))
+        # world.blit(img,(400,200))
         pygame.draw.line(world, RED, (self.x, self.y), 
         (self.x+math.cos(self.theta)*self.sensor_range,
         self.y+math.sin(self.theta)*self.sensor_range),width=2)
@@ -165,11 +167,13 @@ class Robot:
         img = font.render(f'Visited Cells: {len(self.visited_cells)}', True, (0,0,0))
         world.blit(img,(self.x,self.y))  
 
-    def draw_robot(self,world):
-
+    def draw_robot(self,world, debug=False):
+        font = pygame.font.SysFont(None, 24)
         self.trans_img = pygame.transform.rotozoom(self.base_img,
                                                  math.degrees(-self.theta), 1)
         self.hitbox = self.trans_img.get_rect(center=(self.x, self.y))
+        img = font.render(f'ID: {self.id}', True, (0,0,0))
+        world.blit(img,(self.x,self.y-20))    
         world.blit(self.trans_img, self.hitbox)
 
     def draw_robot_bb(self,world):
@@ -183,41 +187,47 @@ class Robot:
         # self.draw_visited_cells(world)
         # self.draw_robot_bb(world)
         #self.debug_token(world)
-        # self.draw_sensor_orientation(world)
-        # self.draw_sensor_activation(world)
+        self.draw_sensor_orientation(world)
+        self.draw_sensor_activation(world)
         # self.debug_theta(world)
         # self.draw_token(world)
 
-    # def update_sensors(self, nearby_obstacles):
-    #         self.sensor = [0, 0, 0, 0, 0, 0]
-    #         for obstacle in nearby_obstacles:
-    #             dist_to_wall = calc_distance((self.x, self.y), (obstacle.x, obstacle.y))
-    #             if dist_to_wall-self.width <= self.sensor_range:
-    #                 angle_w_wall = calc_angle((self.x, self.y), (obstacle.x, obstacle.y))
-    #                 relative_angle = math.degrees(self.theta - angle_w_wall) 
+    def update_sensors(self, nearby_obstacles, world_map):
+            tile_size = world_map.tile_size
+            self.sensor = [0, 0, 0, 0, 0, 0]
+            for obstacle in nearby_obstacles:
+                dist_to_wall = calc_distance((self.x, self.y), (obstacle.x, obstacle.y))
+                if dist_to_wall <= self.sensor_range:
+                    # Testing
+                    v1 = (math.cos(self.theta), math.sin(self.theta))
+                    v2 = (obstacle.x - self.x, obstacle.y - self.y)
+                    relative_angle = calc_angle(v1,v2)
 
-    #                 for i, sensor_angle in enumerate(self.sensor_spacing):
-    #                     sensor_start = (sensor_angle - self.sensor_sweep)
-    #                     sensor_end = (sensor_angle + self.sensor_sweep) 
-    #                     if sensor_start <= relative_angle < sensor_end:
-    #                         print(f"Sensor {i}: {sensor_start} <= {relative_angle} < {sensor_angle}")
-    #                         self.sensor[i + 1] = 1
+                    for i, sensor_angle in enumerate(self.sensor_spacing):
+            
+                        sensor_start = (sensor_angle - self.sensor_sweep)
+                        sensor_end = (sensor_angle + self.sensor_sweep) 
+                        if sensor_start <= math.degrees(relative_angle) < sensor_end:
+                            # pygame.draw.rect(world_map.surf, SENSOR_COLORS[i], obstacle)
+                            # pygame.draw.line(world_map.surf,SENSOR_COLORS[i],(self.x,self.y),(obstacle.x,obstacle.y), width=3)
+                            self.sensor[i + 1] = 1
+                            break
                             
-    #         return
+            return
     
         
-    def update_sensors(self, nearby_obstacles, world_map:WorldMap):
-        self.sensor = [0, 0, 0, 0, 0, 0]
-        start_point = (self.x,self.y)
-        sensors = [pygame.draw.line(world_map.surf,PURPLE,start_point, 
-                            (self.x+math.cos(self.theta-math.radians(spacing))*self.sensor_range,
-                            self.y+math.sin(self.theta-math.radians(spacing))*self.sensor_range), width=3) for spacing in self.sensor_spacing]
+    # def update_sensors(self, nearby_obstacles, world_map:WorldMap):
+    #     self.sensor = [0, 0, 0, 0, 0, 0]
+    #     start_point = (self.x,self.y)
+    #     sensors = [pygame.draw.line(world_map.surf,PURPLE,start_point, 
+    #                         (self.x+math.cos(self.theta-math.radians(spacing))*self.sensor_range,
+    #                         self.y+math.sin(self.theta-math.radians(spacing))*self.sensor_range), width=3) for spacing in self.sensor_spacing]
         
-        for i in range(len(self.sensor)-1):
-            walls_near = sensors[i].collidelist(nearby_obstacles)
-            if walls_near > 0:
-                self.sensor[i+1] = 1
-        return
+    #     for i in range(len(self.sensor)-1):
+    #         walls_near = sensors[i].collidelist(nearby_obstacles)
+    #         if walls_near > 0:
+    #             self.sensor[i+1] = 1
+    #     return
      
 
     def get_collision(self, nearby_obstacles):
@@ -284,8 +294,8 @@ class Robot:
         self.omega = (self.vl - self.vr) / self.w
         self.theta += self.omega * dt
 
-        if abs(self.theta) >= 2*math.pi:
-            self.theta = 0
+        if self.theta >= math.pi:
+            self.theta = -math.pi
         wall_elasticity = 0.5
         if self.sensor[0]:
             # Approach wall from Top Left
@@ -332,7 +342,7 @@ class Robot:
         return
     
     def get_reward(self):
-        return (self.dist_travelled/self.m2p) + 75*self.token + 5*len(self.visited_cells) - self.collision/100
+        return (self.dist_travelled/self.m2p) + 2.5*self.token + 0.05*len(self.visited_cells) - self.collision*0.05
     
     # def get_reward(self):
     #     return (self.dist_travelled/self.m2p) * (1+self.token) - (self.collision/len(self.visited_cells))
