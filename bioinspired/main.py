@@ -8,11 +8,11 @@ from src.runners.genetic_algorithm import GeneticAlgorithmRunner
 
 # seeds = [30,42,50,70,80,100]
 seeds = [30]
-epochs = 1
-time = 1000000000000* 1000 # milliseconds
-n_robots = 10
+epochs = 50
+time = 90 * 1000 # milliseconds
+n_robots = 210
 ls_cross_rate = [1]
-ls_mut_rate = [0.6]
+ls_mut_rate = [0.8] 
 
 for seed in seeds:
     np.random.seed(seed)

@@ -1,14 +1,23 @@
 from ..world_map.txt_to_map import WorldMap
 from ..robot.robot import Robot
 import pygame
-import numpy as np
-import os
+
+import cProfile
+import pstats
+import io
 from ..utility.constants import *
 
-# Initialize the robot
-script_dir = os.path.dirname(__file__)
-rel_path = "../Images/robot.png"
-img_path = os.path.join(script_dir, rel_path)
+
+def profile_update_sensors_to_file(robot, nearby_obstacles, world_map):
+    file_name = "update_sensors.prof"
+    profiler = cProfile.Profile()
+    profiler.enable()
+    
+    robot.update_sensors(nearby_obstacles, world_map)
+    
+    profiler.disable()
+    profiler.dump_stats(file_name)
+    return robot
 
 BLUE = (0,0,255)
 def draw_time(world, time):
@@ -161,7 +170,7 @@ def manual_mode(wm: WorldMap):
                 running = False
             robot.move(robot.get_collision(nearby_obstacles),dt,event)
         robot.move(robot.get_collision(nearby_obstacles), dt)
-        dt = (pygame.time.get_ticks() - lasttime) / 1000
+        dt = 0.01 #(pygame.time.get_ticks() - lasttime) / 1000
         robot.draw(wm.surf)
 
         draw_time(wm.surf, (pygame.time.get_ticks()- loadtime))

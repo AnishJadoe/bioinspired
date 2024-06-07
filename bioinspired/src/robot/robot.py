@@ -1,7 +1,7 @@
+import cProfile
 import numpy as np
 import pygame
 import math
-
 import pygame.locals
 
 from ..utility.functions import calc_angle, calc_distance
@@ -16,6 +16,17 @@ BLUE = (0, 0, 255)
 BROWN = (139, 69, 19)
 ORANGE = (255, 165, 0)
 SENSOR_COLORS = [RED,DARK_GREEN,PURPLE,ORANGE,BLUE]
+
+def profile_update_sensors_to_file(robot, nearby_obstacles, world_map):
+    file_name = "update_sensors.prof"
+    profiler = cProfile.Profile()
+    profiler.enable()
+    
+    robot.update_sensors(nearby_obstacles, world_map)
+    
+    profiler.disable()
+    profiler.dump_stats(file_name)
+    return robot
 
 def find_closest_cell(agent_location, movable_cells):
     # Extract the coordinates of the agent's location
@@ -70,7 +81,8 @@ class Robot:
         self.dist_travelled = 0
         self.avg_dist = 0
 
-        self.sensor_spacing = [-150,-60 , 0, 60, 150]
+        self.sensor_spacing = [math.radians(-150),math.radians(-60) , 
+                               math.radians(0), math.radians(60), math.radians(150)]
         self.sensor = [
             0,
             0,
@@ -80,7 +92,10 @@ class Robot:
             0,
         ]  # 1 tactile sensor (sensor[0]) and 5 ultrasound
         self.sensor_range = 45
-        self.sensor_sweep = 25 # degrees
+        self.sensor_sweep = math.radians(25) # degrees
+        # Precompute sensor angle ranges
+        self.sensor_ranges = [(sensor_angle - self.sensor_sweep, sensor_angle + self.sensor_sweep) 
+                        for sensor_angle in self.sensor_spacing]
         self.width = width 
         self.length = width 
         self.collision = 0
@@ -192,26 +207,32 @@ class Robot:
         # self.draw_token(world)
 
     def update_sensors(self, nearby_obstacles, world_map):
-            tile_size = world_map.tile_size
-            self.sensor = [0, 0, 0, 0, 0, 0]
-            for obstacle in nearby_obstacles:
-                dist_to_wall = calc_distance((self.x, self.y), (obstacle.x, obstacle.y))
-                if dist_to_wall <= self.sensor_range:
-                    # Testing
-                    v1 = (math.cos(self.theta), math.sin(self.theta))
-                    v2 = (obstacle.x - self.x, obstacle.y - self.y)
-                    relative_angle = calc_angle(v1,v2)
-
-                    for i, sensor_angle in enumerate(self.sensor_spacing):
-                        sensor_start = (sensor_angle - self.sensor_sweep)
-                        sensor_end = (sensor_angle + self.sensor_sweep) 
-                        if sensor_start <= math.degrees(relative_angle) < sensor_end:
-                            pygame.draw.rect(world_map.surf, SENSOR_COLORS[i], obstacle)
-                            pygame.draw.line(world_map.surf,SENSOR_COLORS[i],(self.x,self.y),(obstacle.x,obstacle.y), width=3)
-                            self.sensor[i + 1] = 1
-                            break
-                            
-            return 
+        # Reset sensors
+        self.sensor = [0, 0, 0, 0, 0, 0]
+        tile_size = world_map.tile_size
+        # Precompute cos and sin of theta
+        def bin_angle(angle, bin_width=0.1):
+            """Bins the angle to the nearest bin width."""
+            return round(angle / bin_width) * bin_width
+        rounded_theta = bin_angle(self.theta,1)
+        cos_theta = math.cos(rounded_theta)
+        sin_theta = math.sin(rounded_theta)
+        
+        for obstacle in nearby_obstacles:
+            # Calculate distance to obstacle
+            v2_x = obstacle.x // tile_size - self.x //tile_size
+            v2_y = obstacle.y // tile_size - self.y // tile_size
+            dist_to_wall = np.hypot(v2_x, v2_y)
+            if dist_to_wall <= self.sensor_range:
+                # Calculate the angle between robot direction and obstacle
+                relative_angle = calc_angle((cos_theta, sin_theta), (v2_x, v2_y))
+                # Check which sensor should be activated
+                for i, (sensor_start, sensor_end) in enumerate(self.sensor_ranges):
+                    if sensor_start <= relative_angle < sensor_end:
+                        self.sensor[i + 1] = 1
+                        break
+        
+        return
 
     def get_collision(self, nearby_obstacles):
         """Function to calculate whetere collisions between the walls and the agent have occured
@@ -239,93 +260,78 @@ class Robot:
         self.tokens_locations.pop(tokens_collected)
         return
 
-    def move(self, wall_collided, dt,event=None, auto=False):
-
+    def move(self, wall_collided, dt, event=None, auto=False):
         self.ls_x.append(self.x)
         self.ls_y.append(self.y)
-        self.ls_theta.append(self.theta)        
+        self.ls_theta.append(self.theta)
 
-        # Calculating the amount of distance traveled since last time step and adding
-        # this to absolute distance travelled
         if len(self.ls_x) >= 2:
-            delta_x = float(self.ls_x[-2] - self.ls_x[-1])
-            delta_y = float(self.ls_y[-2] - self.ls_y[-1])
-            delta_r = np.sqrt(delta_x**2 + delta_y**2)
+            delta_x = self.ls_x[-2] - self.ls_x[-1]
+            delta_y = self.ls_y[-2] - self.ls_y[-1]
+            delta_r = np.hypot(delta_x, delta_y)  # Efficient calculation of sqrt(delta_x^2 + delta_y^2)
             self.dist_travelled += delta_r
 
-
         if auto:
-
-            # Mapping from current state of the sensors to movement of the robot
-            # No vector multiplication! 
             index = np.where((self.all_states == self.sensor).all(axis=1))[0][0]
             actions = self.chromosome[index]
-            self.vl = actions[0] 
-            self.vr = actions[1] 
-        else:
-            if event:
-                if event.type == pygame.KEYDOWN or event.type==pygame.KEYUP:
-                    if event.key == pygame.locals.K_a:  # 1 is accelerate left
-                        self.vl += 0.01 * self.m2p
-                    elif event.key == pygame.locals.K_s:  # 3 is decelerate left
-                        self.vl -= 0.01 * self.m2p
-                    elif event.key == pygame.locals.K_k:  # 8 is accelerate right
-                        self.vr += 0.01 * self.m2p
-                    elif event.key == pygame.locals.K_j:  # 0 is decelerate right
-                        self.vr -= 0.01 * self.m2p
-                
+            self.vl = actions[0]
+            self.vr = actions[1]
+        elif event:
+            if event.type in {pygame.KEYDOWN, pygame.KEYUP}:
+                if event.key == pygame.locals.K_a:
+                    self.vl += 0.01 * self.m2p
+                elif event.key == pygame.locals.K_s:
+                    self.vl -= 0.01 * self.m2p
+                elif event.key == pygame.locals.K_k:
+                    self.vr += 0.01 * self.m2p
+                elif event.key == pygame.locals.K_j:
+                    self.vr -= 0.01 * self.m2p
+
         self.omega = (self.vl - self.vr) / self.w
         self.theta += self.omega * dt
 
         if self.theta >= math.pi:
-            self.theta = -math.pi
+            self.theta -= 2 * math.pi
+
         wall_elasticity = 0.5
         if self.sensor[0]:
-            # Approach wall from Top Left
-            if self.x > wall_collided.x \
-                    and self.y > wall_collided.y:  
-                self.x += (wall_elasticity+1) 
+            if self.x > wall_collided.x and self.y > wall_collided.y:
+                self.x += wall_elasticity + 1
                 self.y += wall_elasticity
-            # Approach wall from Top Right
-            elif self.x <= wall_collided.x \
-                    and self.y > wall_collided.y:  
+            elif self.x <= wall_collided.x and self.y >= wall_collided.y:
                 self.x -= wall_elasticity
-                self.y += (wall_elasticity+1) 
-            # Approach wall from Bottom Left
-            elif self.x > wall_collided.x \
-                    and self.y <= wall_collided.y:  
+                self.y += wall_elasticity + 1
+            elif self.x >= wall_collided.x and self.y <= wall_collided.y:
                 self.x += wall_elasticity
-                self.y -= (wall_elasticity+1)
-            # Approach wall from Bottom Right
-            elif self.x <= wall_collided.x \
-                    and self.y <= wall_collided.y:  
-                self.x -= (wall_elasticity+1)
+                self.y -= wall_elasticity + 1
+            elif self.x <= wall_collided.x and self.y <= wall_collided.y:
+                self.x -= wall_elasticity + 1
                 self.y -= wall_elasticity
-            else:  # Edge case, assume flip whole car
-                self.theta += math.pi * 0.5 
+            else:
+                self.theta += math.pi * 0.5
         else:
-            self.x += (((self.vl + self.vr) / 2) * math.cos(-self.theta) *
-                        dt)
-            self.y -= (((self.vl + self.vr) / 2) * math.sin(-self.theta) *
-                        dt)
-        
-        # Detects if we're within map borders
-        if self.x < 0 + 0.5 * self.length:
-            self.x = 0 + 2 + 0.5 * self.length
+            cos_theta = math.cos(-self.theta)
+            sin_theta = math.sin(-self.theta)
+            avg_velocity = (self.vl + self.vr) / 2
+            self.x += avg_velocity * cos_theta * dt
+            self.y -= avg_velocity * sin_theta * dt
 
-        if self.x >= MAP_SIZE[0] - 1.2 * self.length:
-            self.x = MAP_SIZE[0] - 2 - 1.2 * self.length
+        half_length = 0.5 * self.length
+        half_width = 0.5 * self.width
+        if self.x < half_length:
+            self.x = half_length + 2
+        elif self.x >= MAP_SIZE[0] - 1.2 * self.length:
+            self.x = MAP_SIZE[0] - 1.2 * self.length - 2
 
-        if self.y < 0 + 0.5 * self.width:
-            self.y = 0 + 2 + 0.5 * self.width
-
-        if self.y >= MAP_SIZE[1] - 1.2 * self.width:
-            self.y = MAP_SIZE[1] - 2 - 1.2 * self.width
+        if self.y < half_width:
+            self.y = half_width + 2
+        elif self.y >= MAP_SIZE[1] - 1.2 * self.width:
+            self.y = MAP_SIZE[1] - 1.2 * self.width - 2
 
         return
     
     def get_reward(self):
-        return (self.dist_travelled/self.m2p) + 2.5*self.token + 0.05*len(self.visited_cells) - self.collision*0.05
+        return 5*(self.dist_travelled/self.m2p) + 2.5*self.token + 0.3*len(self.visited_cells) - self.collision*0.1
     
     # def get_reward(self):
     #     return (self.dist_travelled/self.m2p) * (1+self.token) - (self.collision/len(self.visited_cells))
@@ -334,12 +340,18 @@ class Robot:
         nearby_obstacles = []
         cell_x = int(self.x // world_map.tile_size)
         cell_y = int(self.y // world_map.tile_size)
+        min_range_x = max(0, cell_x - 3)
+        max_range_x = min(world_map.map_width, cell_x + 4)
+        min_range_y = max(0, cell_y - 3)
+        max_range_y = min(world_map.map_height, cell_y + 4)
+
         self.visited_cells.add((cell_x,cell_y))
-        for i in range(max(0, cell_x - 6), min(world_map.map_width, cell_x + 7)):
-            for j in range(max(0, cell_y - 6), min(world_map.map_height, cell_y + 7)):
+        for i in range(min_range_x, max_range_x):
+            for j in range(min_range_y, max_range_y):
                 if world_map.binary_map[i][j] == 1:
                     nearby_obstacles.extend(world_map.spatial_grid[i][j])
         return nearby_obstacles
+    
 
 
         

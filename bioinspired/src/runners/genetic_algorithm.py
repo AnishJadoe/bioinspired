@@ -1,6 +1,6 @@
 import os
 from ..world_map.txt_to_map import WorldMap
-from ..utility.functions import get_init_pop
+from ..utility.functions import cache_size, cache_size_kb, get_init_pop
 from ..utility.run_simulation import run_simulation
 import math
 import random
@@ -160,13 +160,12 @@ class GeneticAlgorithmRunner:
             print(f"GENERATION: {self.gen}")
             self._save_population()
             # Build world
-            wm = WorldMap(skeleton_file="bioinspired\src\world_map\maps\H_map.txt", map_width=60, map_height=40, tile_size=15)
+            wm = WorldMap(skeleton_file="bioinspired\src\world_map\maps\H_map_sparse.txt", map_width=60, map_height=40, tile_size=15)
             population_results = run_simulation(
                 wm, self.run_time, self.pop, self.n_robots, self.gen
             )
     
             self._save_results(population_results)
-
             self.fitness = population_results["pop_fitness"]
             for i in range(self.n_robots):
                 if self.fitness[i] > self.best_eval:
@@ -198,6 +197,7 @@ class GeneticAlgorithmRunner:
 
             self.pop = children[:self.n_robots+1]
             self.gen += 1
+            print(f"Size of cache is {cache_size_kb()/1000} MB")
 
         return
 
