@@ -1,7 +1,8 @@
 import os
 from ..world_map.txt_to_map import WorldMap
-from ..utility.functions import cache_size, cache_size_kb, get_init_pop
+from ..utility.functions import cache_size_kb, get_init_chromosomes_NN
 from ..utility.run_simulation import run_simulation
+from ..utility.constants import *
 import math
 import random
 import numpy as np
@@ -27,7 +28,7 @@ class GeneticAlgorithmRunner:
         self.epochs = epochs
         self.fitness = list()
         self.best_eval = 0
-        self.pop = get_init_pop(self.n_robots)
+        self.pop = get_init_chromosomes_NN(self.n_robots, N_INPUTS,N_OUTPUTS,N_HIDDEN)
         self.best_agent = self.pop[0]
         self.gen = 1
         self.run_time = run_time
@@ -141,11 +142,14 @@ class GeneticAlgorithmRunner:
 
         return [child1.reshape(parent1.shape), child2.reshape(parent2.shape)]
         
-    def add_best_individuals(self, children):
+    def get_best_individuals(self):
+        best_individuals = list()
         index = min(-1, -math.floor(self.n_robots * 0.10))  # take best 10%
         elitst_children = np.argsort(np.array(self.fitness))[index:]
-        children.extend([self.pop[i] for i in elitst_children])
-        return children
+        best_individuals.extend([self.pop[i] for i in elitst_children])
+        best_fitness = [self.fitness[i] for i in elitst_children]
+        print(f"Adding individuals with fitness {best_fitness} ")
+        return best_individuals
 
     def run(self):
         """This is the main loop for the algorithm. First a base score is set-up by running the algorithm with the inital population
@@ -160,7 +164,8 @@ class GeneticAlgorithmRunner:
             print(f"GENERATION: {self.gen}")
             self._save_population()
             # Build world
-            wm = WorldMap(skeleton_file="bioinspired\src\world_map\maps\H_map_sparse.txt", map_width=60, map_height=40, tile_size=15)
+            wm = WorldMap(skeleton_file="bioinspired/src/world_map/maps/H_map_sparse.txt", 
+                          map_width=MAP_DIMS[0], map_height=MAP_DIMS[1], tile_size=CELL_SIZE)
             population_results = run_simulation(
                 wm, self.run_time, self.pop, self.n_robots, self.gen
             )
@@ -177,7 +182,8 @@ class GeneticAlgorithmRunner:
 
             children = list()
             # elitism
-            children = self.add_best_individuals(children)
+            best_individuals = self.get_best_individuals()
+            children.extend(best_individuals)
             parents = self.tournament_selection()
 
             mating = True
@@ -186,7 +192,6 @@ class GeneticAlgorithmRunner:
                 parent2_index = np.random.randint(0, len(parents))
                 parent1 = parents[parent1_index]
                 parent2= parents[parent2_index]
-                flip = np.random.uniform(0, 1)
 
                 for c in self.two_point_crossover(parent1, parent2):
                     self.mutation(c)

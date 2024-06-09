@@ -65,7 +65,7 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
             special = False
         ls_robots.append(
             Robot(robot_id=i, startpos=(wm.start_pos.x, wm.start_pos.y), width=20, 
-                  chromosome=pop[i], token_locations=wm.tokens, special_flag=special)
+                  chromosome=pop[i], token_locations=wm.tokens.copy(), special_flag=special)
         )
 
     dt = 0
@@ -84,6 +84,7 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
         # Update frame by redrawing everything
         wm.update_map()
         for robot in ls_robots:
+            robot.update_state()
             nearby_obstacles = robot.find_position(wm)
             robot.update_sensors(nearby_obstacles,wm)
             robot.get_tokens()
@@ -127,9 +128,13 @@ def single_agent_run(wm: WorldMap, time, chromosome):
     robot = Robot((wm.start_pos.x, wm.start_pos.y), width=20, 
                   chromosome=chromosome, token_locations=wm.tokens, special_flag=True)
     token_amount = len(wm.tokens)
+    running = True
     # Simulation loop
-    while pygame.time.get_ticks() <= (time+loadtime) or token_amount == 0:
+    while pygame.time.get_ticks() <= (time+loadtime) and running:
         clock.tick(60)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
         dt = (pygame.time.get_ticks() - lasttime) / 1000
         # Update frame by redrawing everything
         wm.update_map()

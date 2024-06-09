@@ -7,28 +7,14 @@ import pygame.locals
 from ..utility.functions import calc_angle, calc_distance
 from ..world_map.txt_to_map import WorldMap
 from ..utility.constants import *
+from ..robot.neural_net import NeuralNet
 
-WHITE = (255,255,255,128)
-DARK_GREEN = (0, 255, 0)
-RED = (255, 0, 0)
-PURPLE = (128, 0, 128)
-BLUE = (0, 0, 255)
-BROWN = (139, 69, 19)
-ORANGE = (255, 165, 0)
-SENSOR_COLORS = [RED,DARK_GREEN,PURPLE,ORANGE,BLUE]
+def bin_angle(angle, bin_width=0.1):
+        """Bins the angle to the nearest bin width."""
+        return round(angle / bin_width) * bin_width
 
-def profile_update_sensors_to_file(robot, nearby_obstacles, world_map):
-    file_name = "update_sensors.prof"
-    profiler = cProfile.Profile()
-    profiler.enable()
-    
-    robot.update_sensors(nearby_obstacles, world_map)
-    
-    profiler.disable()
-    profiler.dump_stats(file_name)
-    return robot
 
-def find_closest_cell(agent_location, movable_cells):
+def find_closest_cell(agent_location, cells):
     # Extract the coordinates of the agent's location
     agent_x, agent_y = agent_location
     
@@ -37,12 +23,12 @@ def find_closest_cell(agent_location, movable_cells):
     min_distance = float('inf')
     
     # Iterate through movable cells to find the closest one
-    for index, cell in enumerate(movable_cells):
+    for index, cell in enumerate(cells):
         # Extract the coordinates of the movable cell
-        cell_x, cell_y, _, _ = cell
+        cell_x , cell_y, _, _ = cell
         
         # Calculate the Euclidean distance between the agent and the cell
-        distance = math.sqrt((agent_x - cell_x)**2 + (agent_y - cell_y)**2)
+        distance = math.sqrt((agent_x - cell_x // CELL_SIZE)**2 + (agent_y - cell_y // CELL_SIZE)**2)
         
         # Update the closest cell index and distance if necessary
         if distance < min_distance:
@@ -55,6 +41,7 @@ class Robot:
     def __init__(self,  startpos, width, chromosome, token_locations, special_flag,robot_id=1):
         self.id = robot_id + 1
         self.chromosome = chromosome
+        self.controller = NeuralNet(n_inputs=N_INPUTS,n_outputs=N_OUTPUTS,n_hidden=N_HIDDEN,chromosome=self.chromosome)
         self.m2p = 3779.52  # meters 2 pixels
         self.w = width * 20
         self.tokens_locations = token_locations
@@ -62,8 +49,10 @@ class Robot:
         self.init_pos = startpos
         self.x = startpos[0]
         self.y = startpos[1]
-        self.current_tile = 0
+        self.delta_x = 0 # difference between current x and desired x
+        self.delta_y = 0 # difference between current y and desired y
         self.theta = 0
+        
         self.vl = 0
         self.vr = 0
         self.maxspeed = 255
@@ -76,7 +65,6 @@ class Robot:
         self.ls_x = []
         self.ls_y = []
         self.omega = 0
-
 
         self.dist_travelled = 0
         self.avg_dist = 0
@@ -96,19 +84,24 @@ class Robot:
         # Precompute sensor angle ranges
         self.sensor_ranges = [(sensor_angle - self.sensor_sweep, sensor_angle + self.sensor_sweep) 
                         for sensor_angle in self.sensor_spacing]
+        
+        self.state = np.array([self.delta_x,self.delta_y,self.theta, *self.sensor]).reshape(-1,1)
+        
         self.width = width 
         self.length = width 
         self.collision = 0
         self.token = 0
         self.special = special_flag
+        self.looking_for_token = False
+        self.closest_token = self.tokens_locations[0]
 
         # Build robot images
         if self.special:
-            self.base_img = pygame.image.load(r"bioinspired\src\robot\images\robot_special.png")
+            self.base_img = pygame.image.load(r"bioinspired/src/robot/images/robot_special.png")
             self.base_img = pygame.transform.scale(self.base_img, (self.width, self.length))
             self.base_img = pygame.transform.rotate(self.base_img, 0)
         else:   
-            self.base_img = pygame.image.load(r"bioinspired\src\robot\images\robot_normal.png")
+            self.base_img = pygame.image.load(r"bioinspired/src/robot/images/robot_normal.png")
             self.base_img = pygame.transform.scale(self.base_img, (self.width, self.length))
             self.base_img = pygame.transform.rotate(self.base_img, 0)
         
@@ -116,13 +109,14 @@ class Robot:
         self.hitbox = self.trans_img.get_rect(center=(self.x, self.y))
         
         # Initialize sensor image 
-        self.sensor_on_img = pygame.image.load(r"bioinspired\src\robot\images\distance_sensor_on.png")
-        self.sensor_off_img = pygame.image.load(r"bioinspired\src\robot\images\distance_sensor_off.png")
+        self.sensor_on_img = pygame.image.load(r"bioinspired/src/robot/images/distance_sensor_on.png")
+        self.sensor_off_img = pygame.image.load(r"bioinspired/src/robot/images/distance_sensor_off.png")
         self.sensor_on_img = pygame.transform.scale(self.sensor_on_img,(20,100))
         self.sensor_off_img = pygame.transform.scale(self.sensor_off_img,(20,100))
 
     def _attitude(self):
         return(self.x,self.y,math.degrees(self.theta))
+    
     def draw_sensor_orientation(self,world):
         for i,sensor in enumerate(self.sensor[1:]):
             sensor_angle = self.sensor_spacing[i]
@@ -211,9 +205,6 @@ class Robot:
         self.sensor = [0, 0, 0, 0, 0, 0]
         tile_size = world_map.tile_size
         # Precompute cos and sin of theta
-        def bin_angle(angle, bin_width=0.1):
-            """Bins the angle to the nearest bin width."""
-            return round(angle / bin_width) * bin_width
         rounded_theta = bin_angle(self.theta,1)
         cos_theta = math.cos(rounded_theta)
         sin_theta = math.sin(rounded_theta)
@@ -247,17 +238,40 @@ class Robot:
         else:
             return 0
         
-
+    def get_action(self):
+        return self.controller.forward_pass(self.state)
+    
+        
+    def get_reference_position(self):
+            
+     
+        closest_cell_index = find_closest_cell((self.x // CELL_SIZE, self.y // CELL_SIZE), self.tokens_locations)
+        self.closest_token = self.tokens_locations[closest_cell_index]
+        self.looking_for_token = True
+        
+        self.delta_x = round(self.x - self.closest_token.x)
+        self.delta_y = round(self.y - self.closest_token.y)
+    
+        # if self.closest_token not in self.tokens_locations:
+        #     self.looking_for_token = False
+        
+        
+    def update_state(self):
+        self.get_reference_position()
+        self.state = np.array([self.delta_x,self.delta_y,bin_angle(self.theta,1), *self.sensor]).reshape(-1,1)
+        return
+        
     def get_tokens(self):
         '''
         Function to check if we have collided with a token, when this happens the
         robot obtains a token
         '''
-        tokens_collected = self.hitbox.collidelist(self.tokens_locations) 
-        if tokens_collected == -1:
+        token_collected = self.hitbox.collidelist(self.tokens_locations) 
+        if token_collected == -1:
             return
         self.token += 1
-        self.tokens_locations.pop(tokens_collected)
+        self.tokens_locations.pop(token_collected)
+            
         return
 
     def move(self, wall_collided, dt, event=None, auto=False):
@@ -272,10 +286,11 @@ class Robot:
             self.dist_travelled += delta_r
 
         if auto:
-            index = np.where((self.all_states == self.sensor).all(axis=1))[0][0]
-            actions = self.chromosome[index]
-            self.vl = actions[0]
-            self.vr = actions[1]
+            # index = np.where((self.all_states == self.sensor).all(axis=1))[0][0]
+            # actions = self.chromosome[index]
+            actions = self.get_action()
+            self.vl = actions[0,:][0]
+            self.vr = actions[1,:][0]
         elif event:
             if event.type in {pygame.KEYDOWN, pygame.KEYUP}:
                 if event.key == pygame.locals.K_a:
@@ -331,7 +346,7 @@ class Robot:
         return
     
     def get_reward(self):
-        return 5*(self.dist_travelled/self.m2p) + 2.5*self.token + 0.3*len(self.visited_cells) - self.collision*0.1
+        return round(5*(self.dist_travelled/self.m2p) + 5*self.token + 0.5*len(self.visited_cells) - self.collision*0.5,1)
     
     # def get_reward(self):
     #     return (self.dist_travelled/self.m2p) * (1+self.token) - (self.collision/len(self.visited_cells))

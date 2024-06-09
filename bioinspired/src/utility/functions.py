@@ -17,7 +17,7 @@ def load_GAs(GAs, folder):
                 GAs.append(GA)
     return GAs
 
-def get_init_pop(n_robots):
+def get_init_chromosomes_heuristic(n_robots):
     """Generate the initial population to run the algorithm with
 
     Args:
@@ -35,6 +35,19 @@ def get_init_pop(n_robots):
         population.append(np.random.randint(low=-255, high=255, size=(64, 2)))
     return population
 
+def get_init_chromosomes_NN(n_robots, n_inputs,n_outputs,n_hidden):
+    np.random.seed(42)
+    population = list()
+    n_weights = n_inputs*n_hidden + n_hidden*n_outputs 
+    n_bias =  n_hidden + n_outputs
+    for i in range(0,n_robots):
+        weights = np.random.uniform(low=-64,high=64, size=(n_weights,1))
+        biases = np.random.uniform(low=-10,high=10, size=(n_bias,1))
+        population.append(np.vstack((weights, biases)))
+        
+    return population
+    
+    
 
 def calc_distance(coord1, coord2):
     """Calculates the distance between 2 points
