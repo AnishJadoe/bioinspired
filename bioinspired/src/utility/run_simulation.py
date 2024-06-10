@@ -22,7 +22,7 @@ def profile_update_sensors_to_file(robot, nearby_obstacles, world_map):
 BLUE = (0,0,255)
 def draw_time(world, time):
     font = pygame.font.SysFont(None, 36)
-    txt = font.render(f'Time: {round(time/1000,1)}', True, BLUE)
+    txt = font.render(f'Time: {round(time,1)}', True, BLUE)
     world.blit(txt,(750,50))
 
 def draw_gen(world, gen):
@@ -68,18 +68,19 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
                   chromosome=pop[i], token_locations=wm.tokens.copy(), special_flag=special)
         )
 
-    dt = 0
     lasttime = pygame.time.get_ticks()
     loadtime = lasttime
     print(f"Loading took: {loadtime/1000} seconds")
     running = True
+    sim_time = 0
+    dt = 0.05
     # Simulation loop
     while pygame.time.get_ticks() <= (time+loadtime) and running:
         clock.tick(20)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-        dt = (pygame.time.get_ticks() - lasttime) / 1000
+        # dt = (pygame.time.get_ticks() - lasttime) / 1000
 
         # Update frame by redrawing everything
         wm.update_map()
@@ -91,9 +92,10 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
             robot.move(robot.get_collision(nearby_obstacles), dt, auto=True)
             robot.draw(wm.surf)
 
-        draw_time(wm.surf, (pygame.time.get_ticks()- loadtime))
+        draw_time(wm.surf, (sim_time))
         draw_gen(wm.surf,gen)
-        lasttime = pygame.time.get_ticks()
+        # lasttime = pygame.time.get_ticks()
+        sim_time += dt
         pygame.display.update()
 
     pygame.quit()
@@ -129,24 +131,23 @@ def single_agent_run(wm: WorldMap, time, chromosome):
                   chromosome=chromosome, token_locations=wm.tokens, special_flag=True)
     token_amount = len(wm.tokens)
     running = True
+    sim_time = 0
+    dt = 0.05
     # Simulation loop
-    while pygame.time.get_ticks() <= (time+loadtime) and running:
-        clock.tick(60)
+    while sim_time <= time and running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-        dt = (pygame.time.get_ticks() - lasttime) / 1000
         # Update frame by redrawing everything
         wm.update_map()
         nearby_obstacles = robot.find_position(wm)
+        robot.update_state()
         robot.update_sensors(nearby_obstacles,wm)
         robot.get_tokens()
         robot.move(robot.get_collision(nearby_obstacles), dt, auto=True)
         robot.draw(wm.surf)
-        token_amount = len(wm.tokens)
-
-        draw_time(wm.surf, (pygame.time.get_ticks()- loadtime))
-        lasttime = pygame.time.get_ticks()
+        draw_time(wm.surf, (sim_time))
+        sim_time += dt
         pygame.display.update()
 
     pygame.quit()

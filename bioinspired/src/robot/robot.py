@@ -249,8 +249,8 @@ class Robot:
         self.closest_token = self.tokens_locations[closest_cell_index]
         self.looking_for_token = True
         
-        self.delta_x = round(self.x - self.closest_token.x)
-        self.delta_y = round(self.y - self.closest_token.y)
+        self.delta_x = round(self.closest_token.x - self.x)
+        self.delta_y = round(self.closest_token.y - self.y)
     
         # if self.closest_token not in self.tokens_locations:
         #     self.looking_for_token = False
@@ -289,8 +289,8 @@ class Robot:
             # index = np.where((self.all_states == self.sensor).all(axis=1))[0][0]
             # actions = self.chromosome[index]
             actions = self.get_action()
-            self.vl = actions[0,:][0]
-            self.vr = actions[1,:][0]
+            self.vl = actions[0,:][0] 
+            self.vr = actions[1,:][0] 
         elif event:
             if event.type in {pygame.KEYDOWN, pygame.KEYUP}:
                 if event.key == pygame.locals.K_a:
@@ -346,7 +346,7 @@ class Robot:
         return
     
     def get_reward(self):
-        return round(5*(self.dist_travelled/self.m2p) + 5*self.token + 0.5*len(self.visited_cells) - self.collision*0.5,1)
+        return round(5*(self.dist_travelled/self.m2p) + 10*self.token + 0.1*len(self.visited_cells) - self.collision*0.3,2)
     
     # def get_reward(self):
     #     return (self.dist_travelled/self.m2p) * (1+self.token) - (self.collision/len(self.visited_cells))
