@@ -30,6 +30,9 @@ def draw_gen(world, gen):
     txt = font.render(f'Gen: {gen}', True, BLUE)
     world.blit(txt,(750,75))
 
+def draw_next_token(world, token):
+    pygame.draw.rect(world,BLUE, token)
+
 # MAIN GAME LOOP
 def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
     """This is the main game loop of the algorithm, it is called by the Genetic Algorithm class in
@@ -72,15 +75,16 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
     loadtime = lasttime
     print(f"Loading took: {loadtime/1000} seconds")
     running = True
-    sim_time = 0
-    dt = 0.05
+    dt = 0
+    tokens_collected = []
     # Simulation loop
     while pygame.time.get_ticks() <= (time+loadtime) and running:
-        clock.tick(20)
+        clock.tick(30)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-        # dt = (pygame.time.get_ticks() - lasttime) / 1000
+        timestamp = (pygame.time.get_ticks()/1000)
+        dt = (pygame.time.get_ticks() - lasttime) / 1000
 
         # Update frame by redrawing everything
         wm.update_map()
@@ -88,14 +92,16 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
             robot.update_state()
             nearby_obstacles = robot.find_position(wm)
             robot.update_sensors(nearby_obstacles,wm)
-            robot.get_tokens()
+            token_to_collect = robot.get_tokens(timestamp)
+            if token_to_collect not in tokens_collected:
+                tokens_collected.append(token_to_collect)
             robot.move(robot.get_collision(nearby_obstacles), dt, auto=True)
             robot.draw(wm.surf)
 
-        draw_time(wm.surf, (sim_time))
+        draw_next_token(wm.surf, tokens_collected[-1])
+        draw_time(wm.surf, (pygame.time.get_ticks()/1000))
         draw_gen(wm.surf,gen)
-        # lasttime = pygame.time.get_ticks()
-        sim_time += dt
+        lasttime = pygame.time.get_ticks()
         pygame.display.update()
 
     pygame.quit()
@@ -119,35 +125,37 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
 
 def single_agent_run(wm: WorldMap, time, chromosome):
     clock = pygame.time.Clock()
-    
     pygame.init()
     wm.build_map()
 
-    dt = 0
     lasttime = pygame.time.get_ticks()
     loadtime = lasttime
     print(f"Loading took: {loadtime/1000} seconds")
     robot = Robot((wm.start_pos.x, wm.start_pos.y), width=20, 
                   chromosome=chromosome, token_locations=wm.tokens, special_flag=True)
-    token_amount = len(wm.tokens)
     running = True
-    sim_time = 0
-    dt = 0.05
+    dt = 0
     # Simulation loop
-    while sim_time <= time and running:
+    while pygame.time.get_ticks() <= (time+loadtime) and running:
+        clock.tick(30)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
         # Update frame by redrawing everything
+        dt = (pygame.time.get_ticks() - lasttime) / 1000
         wm.update_map()
         nearby_obstacles = robot.find_position(wm)
         robot.update_state()
         robot.update_sensors(nearby_obstacles,wm)
-        robot.get_tokens()
+        token_to_collect = robot.get_tokens(0)
         robot.move(robot.get_collision(nearby_obstacles), dt, auto=True)
         robot.draw(wm.surf)
-        draw_time(wm.surf, (sim_time))
-        sim_time += dt
+        draw_next_token(wm.surf, token_to_collect)
+
+
+        draw_time(wm.surf, (pygame.time.get_ticks()/1000))
+        lasttime = pygame.time.get_ticks()
         pygame.display.update()
 
     pygame.quit()
@@ -170,7 +178,7 @@ def manual_mode(wm: WorldMap):
         wm.update_map()
         nearby_obstacles = robot.find_position(wm)
         robot.update_sensors(nearby_obstacles,wm)
-        robot.get_tokens()
+        # robot.get_tokens()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False

@@ -41,8 +41,8 @@ def get_init_chromosomes_NN(n_robots, n_inputs,n_outputs,n_hidden):
     n_weights = n_inputs*n_hidden + n_hidden*n_outputs 
     n_bias =  n_hidden + n_outputs
     for i in range(0,n_robots):
-        weights = np.random.uniform(low=-64,high=64, size=(n_weights,1))
-        biases = np.random.uniform(low=-8,high=8, size=(n_bias,1))
+        weights = np.random.uniform(low=-128,high=128, size=(n_weights,1))
+        biases = np.random.uniform(low=-128,high=128, size=(n_bias,1))
         population.append(np.vstack((weights, biases)))
         
     return population

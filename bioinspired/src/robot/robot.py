@@ -13,7 +13,6 @@ def bin_angle(angle, bin_width=0.1):
         """Bins the angle to the nearest bin width."""
         return round(angle / bin_width) * bin_width
 
-
 def find_closest_cell(agent_location, cells):
     # Extract the coordinates of the agent's location
     agent_x, agent_y = agent_location
@@ -49,6 +48,7 @@ class Robot:
         self.init_pos = startpos
         self.x = startpos[0]
         self.y = startpos[1]
+        self.current_cell = (self.x // CELL_SIZE, self.y // CELL_SIZE)
         self.delta_x = 0 # difference between current x and desired x
         self.delta_y = 0 # difference between current y and desired y
         self.theta = 0
@@ -65,6 +65,8 @@ class Robot:
         self.ls_x = []
         self.ls_y = []
         self.omega = 0
+        self.ls_pos_error = []
+        self.ls_diff_pos_error = []
 
         self.dist_travelled = 0
         self.avg_dist = 0
@@ -90,10 +92,12 @@ class Robot:
         self.width = width 
         self.length = width 
         self.collision = 0
-        self.token = 0
         self.special = special_flag
-        self.looking_for_token = False
-        self.closest_token = self.tokens_locations[0]
+        self.token = 0
+        self.next_token = []
+        self.time_stamps = list()
+        self.need_next_token = True
+        self.same_cell = 0
 
         # Build robot images
         if self.special:
@@ -150,15 +154,15 @@ class Robot:
 
     def debug_theta(self,world):
         font = pygame.font.SysFont(None, 24)
-        img = font.render(f'theta: {round(math.degrees(self.theta),1)}', True, (0,0,0))
-        world.blit(img,(self.x,self.y))
-        # img = font.render(f'vr: {round(self.vr,2)}' , True, (0,0,0))
-        # world.blit(img,(400,300))
-        # img = font.render(f'vl: {round(self.vl,2)}', True, (0,0,0))
-        # world.blit(img,(400,200))
-        pygame.draw.line(world, RED, (self.x, self.y), 
-        (self.x+math.cos(self.theta)*self.sensor_range,
-        self.y+math.sin(self.theta)*self.sensor_range),width=2)
+        # img = font.render(f'theta: {round(math.degrees(self.theta),1)}', True, (0,0,0))
+        # world.blit(img,(self.x,self.y))
+        img = font.render(f'vr: {round(self.vr,2)}' , True, (0,0,0))
+        world.blit(img,(400,300))
+        img = font.render(f'vl: {round(self.vl,2)}', True, (0,0,0))
+        world.blit(img,(400,200))
+        # pygame.draw.line(world, RED, (self.x, self.y), 
+        # (self.x+math.cos(self.theta)*self.sensor_range,
+        # self.y+math.sin(self.theta)*self.sensor_range),width=2)
 
 
     def debug_token(self,world):
@@ -184,6 +188,9 @@ class Robot:
         # img = font.render(f'ID: {self.id}', True, (0,0,0))
         # world.blit(img,(self.x,self.y-20))    
 
+    # def draw_next_token(self,world):
+    #     pygame.draw.rect(world,BLUE, self.next_token)
+
     def draw_robot_bb(self,world):
         pygame.draw.rect(world,RED,self.hitbox, width=1)
         
@@ -192,6 +199,7 @@ class Robot:
         Draws on the world
         '''
         self.draw_robot(world)
+        # self.draw_next_token(world)
         # self.draw_visited_cells(world)
         # self.draw_robot_bb(world)
         #self.debug_token(world)
@@ -244,35 +252,42 @@ class Robot:
         
     def get_reference_position(self):
             
-     
-        closest_cell_index = find_closest_cell((self.x // CELL_SIZE, self.y // CELL_SIZE), self.tokens_locations)
-        self.closest_token = self.tokens_locations[closest_cell_index]
-        self.looking_for_token = True
+        if self.need_next_token:
+            closest_cell_index = find_closest_cell((self.x // CELL_SIZE, self.y // CELL_SIZE), self.tokens_locations)
+            self.next_token = self.tokens_locations[closest_cell_index]
+            self.need_next_token = False
         
-        self.delta_x = round(self.closest_token.x - self.x)
-        self.delta_y = round(self.closest_token.y - self.y)
-    
-        # if self.closest_token not in self.tokens_locations:
-        #     self.looking_for_token = False
+        self.delta_x = round(self.next_token.x - self.x)
+        self.delta_y = round(self.next_token.y - self.y)
+        self.ls_pos_error.append(np.hypot(self.delta_x,self.delta_y) / 10000)
+        if len(self.ls_pos_error) > 1:
+            self.ls_diff_pos_error.append(self.ls_pos_error[-1] - self.ls_pos_error[-2])
+
+        if self.next_token not in self.tokens_locations:
+            self.need_next_token = True
         
         
     def update_state(self):
         self.get_reference_position()
-        self.state = np.array([self.delta_x,self.delta_y,bin_angle(self.theta,1), *self.sensor]).reshape(-1,1)
+        norm = np.linalg.norm(np.array([self.delta_x,self.delta_y]))
+        x = round(self.delta_x / norm,2)
+        y = round(self.delta_y / norm,2)
+        self.state = np.array([x,y,round(self.theta/math.pi,2), *self.sensor]).reshape(-1,1)
         return
         
-    def get_tokens(self):
+    def get_tokens(self, t):
         '''
         Function to check if we have collided with a token, when this happens the
         robot obtains a token
         '''
         token_collected = self.hitbox.collidelist(self.tokens_locations) 
         if token_collected == -1:
-            return
-        self.token += 1
-        self.tokens_locations.pop(token_collected)
-            
-        return
+            return self.next_token
+        if self.next_token == self.tokens_locations[token_collected]:
+            self.token += 1
+            self.time_stamps.append(t)
+            self.tokens_locations.pop(token_collected)
+        return self.next_token
 
     def move(self, wall_collided, dt, event=None, auto=False):
         self.ls_x.append(self.x)
@@ -289,8 +304,8 @@ class Robot:
             # index = np.where((self.all_states == self.sensor).all(axis=1))[0][0]
             # actions = self.chromosome[index]
             actions = self.get_action()
-            self.vl = actions[0,:][0] 
-            self.vr = actions[1,:][0] 
+            self.vl = min(self.maxspeed, max(self.minspeed, actions[0,:][0]) )
+            self.vr = min(self.maxspeed, max(self.minspeed, actions[1,:][0]) )
         elif event:
             if event.type in {pygame.KEYDOWN, pygame.KEYUP}:
                 if event.key == pygame.locals.K_a:
@@ -346,7 +361,24 @@ class Robot:
         return
     
     def get_reward(self):
-        return round(5*(self.dist_travelled/self.m2p) + 10*self.token + 0.1*len(self.visited_cells) - self.collision*0.3,2)
+        getting_closer = [abs(diff) for diff in self.ls_diff_pos_error if diff <= 0]
+        quicknes = []
+        if self.time_stamps:
+            time_between_tokens = [self.time_stamps[0]]
+            for i, _ in enumerate(self.time_stamps[1:]):
+                time_between_tokens.append(self.time_stamps[i] - self.time_stamps[i-1])
+            quicknes = [1/time for time in time_between_tokens]
+            # print(sum(quicknes), sum(getting_closer))
+        return round(
+             25*self.token 
+            # + 5*sum(getting_closer)
+            + 10*sum(quicknes)
+            # + len(self.visited_cells)*0.3
+            # - self.collision*0.1
+            #- sum(self.ls_pos_error)*0.1
+            # - self.same_cell*0.05
+            # - 3*(self.dist_travelled/self.m2p) 
+            ,2)
     
     # def get_reward(self):
     #     return (self.dist_travelled/self.m2p) * (1+self.token) - (self.collision/len(self.visited_cells))
@@ -359,8 +391,11 @@ class Robot:
         max_range_x = min(world_map.map_width, cell_x + 4)
         min_range_y = max(0, cell_y - 3)
         max_range_y = min(world_map.map_height, cell_y + 4)
+        if (cell_x,cell_y) in self.visited_cells:
+            self.same_cell += 1
+        else:
+            self.visited_cells.add((cell_x,cell_y))
 
-        self.visited_cells.add((cell_x,cell_y))
         for i in range(min_range_x, max_range_x):
             for j in range(min_range_y, max_range_y):
                 if world_map.binary_map[i][j] == 1:

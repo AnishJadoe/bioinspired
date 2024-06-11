@@ -164,7 +164,7 @@ class GeneticAlgorithmRunner:
             print(f"GENERATION: {self.gen}")
             self._save_population()
             # Build world
-            wm = WorldMap(skeleton_file="bioinspired/src/world_map/maps/H_map_sparse.txt", 
+            wm = WorldMap(skeleton_file="bioinspired/src/world_map/maps/follow_token_map.txt", 
                           map_width=MAP_DIMS[0], map_height=MAP_DIMS[1], tile_size=CELL_SIZE)
             population_results = run_simulation(
                 wm, self.run_time, self.pop, self.n_robots, self.gen
