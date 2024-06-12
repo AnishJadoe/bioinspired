@@ -32,6 +32,9 @@ class GeneticAlgorithmRunner:
         self.best_agent = self.pop[0]
         self.gen = 1
         self.run_time = run_time
+        
+        self.best_fitness = [10,9,8,7,6,5,4,3,2]
+        self.best_individuals = list()
 
         self.cross_rate = cross_rate
         self.mut_rate = mut_rate
@@ -146,9 +149,16 @@ class GeneticAlgorithmRunner:
         best_individuals = list()
         index = min(-1, -math.floor(self.n_robots * 0.10))  # take best 10%
         elitst_children = np.argsort(np.array(self.fitness))[index:]
-        best_individuals.extend([self.pop[i] for i in elitst_children])
-        best_fitness = [self.fitness[i] for i in elitst_children]
-        print(f"Adding individuals with fitness {best_fitness} ")
+        for index in elitst_children:
+            check_fitness = list(self.fitness[index] >= self.best_fitness)
+            if sum(check_fitness):
+                index_fitness = check_fitness.index(True)
+                if index_fitness <= len(self.best_fitness):
+                    self.best_fitness.insert(index_fitness, self.fitness[index])
+                    self.best_individuals.extend([self.pop[index]])
+                    self.best_fitness = self.best_fitness[:len(elitst_children)]
+                    self.best_individuals = self.best_individuals[:len(elitst_children)]
+        print(f"Current best individuals have fitenss {self.best_fitness} ")
         return best_individuals
 
     def run(self):

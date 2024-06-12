@@ -9,6 +9,9 @@ from ..world_map.txt_to_map import WorldMap
 from ..utility.constants import *
 from ..robot.neural_net import NeuralNet
 
+def bound(value, low, high):
+    return max(low, min(high, value))
+
 def bin_angle(angle, bin_width=0.1):
         """Bins the angle to the nearest bin width."""
         return round(angle / bin_width) * bin_width
@@ -48,9 +51,12 @@ class Robot:
         self.init_pos = startpos
         self.x = startpos[0]
         self.y = startpos[1]
+        self.vx = 0
+        self.vy = 0
         self.current_cell = (self.x // CELL_SIZE, self.y // CELL_SIZE)
         self.delta_x = 0 # difference between current x and desired x
         self.delta_y = 0 # difference between current y and desired y
+        self.error_to_goal = 0
         self.theta = 0
         
         self.vl = 0
@@ -65,7 +71,7 @@ class Robot:
         self.ls_x = []
         self.ls_y = []
         self.omega = 0
-        self.ls_pos_error = []
+        self.closeness = []
         self.ls_diff_pos_error = []
 
         self.dist_travelled = 0
@@ -87,7 +93,7 @@ class Robot:
         self.sensor_ranges = [(sensor_angle - self.sensor_sweep, sensor_angle + self.sensor_sweep) 
                         for sensor_angle in self.sensor_spacing]
         
-        self.state = np.array([self.delta_x,self.delta_y,self.theta, *self.sensor]).reshape(-1,1)
+        self.state = np.array([self.x/MAP_SIZE[0],self.y/MAP_SIZE[1],self.vl/self.maxspeed,self.vr/self.maxspeed, round(self.error_to_goal // CELL_SIZE), self.theta/math.pi, self.omega/math.pi, *self.sensor]).reshape(-1,1)
         
         self.width = width 
         self.length = width 
@@ -100,10 +106,15 @@ class Robot:
         self.same_cell = 0
 
         # Build robot images
-        if self.special:
+        if self.special and self.id != 1:
             self.base_img = pygame.image.load(r"bioinspired/src/robot/images/robot_special.png")
             self.base_img = pygame.transform.scale(self.base_img, (self.width, self.length))
             self.base_img = pygame.transform.rotate(self.base_img, 0)
+        elif self.id == 1:
+            self.base_img = pygame.image.load(r"bioinspired/src/robot/images/robot_one.png")
+            self.base_img = pygame.transform.scale(self.base_img, (self.width, self.length))
+            self.base_img = pygame.transform.rotate(self.base_img, 0)
+            
         else:   
             self.base_img = pygame.image.load(r"bioinspired/src/robot/images/robot_normal.png")
             self.base_img = pygame.transform.scale(self.base_img, (self.width, self.length))
@@ -228,7 +239,7 @@ class Robot:
                 # Check which sensor should be activated
                 for i, (sensor_start, sensor_end) in enumerate(self.sensor_ranges):
                     if sensor_start <= relative_angle < sensor_end:
-                        self.sensor[i + 1] = 1
+                        self.sensor[i + 1] = (1 - dist_to_wall/self.sensor_range)
                         break
         
         return
@@ -240,10 +251,11 @@ class Robot:
 
         collided_walls = self.hitbox.collidelist(nearby_obstacles)
         if collided_walls != NO_COLLISIONS: # -1 equals no collision:
-            self.collision += 1
+            self.collision -= 20
             self.sensor[0] = 1
             return nearby_obstacles[collided_walls]
         else:
+            self.collision += 1
             return 0
         
     def get_action(self):
@@ -255,13 +267,15 @@ class Robot:
         if self.need_next_token:
             closest_cell_index = find_closest_cell((self.x // CELL_SIZE, self.y // CELL_SIZE), self.tokens_locations)
             self.next_token = self.tokens_locations[closest_cell_index]
+            self.shortest_route = round(calc_distance((self.x ,self.y), (self.next_token.x,self.next_token.y)))
             self.need_next_token = False
         
-        self.delta_x = round(self.next_token.x - self.x)
-        self.delta_y = round(self.next_token.y - self.y)
-        self.ls_pos_error.append(np.hypot(self.delta_x,self.delta_y) / 10000)
-        if len(self.ls_pos_error) > 1:
-            self.ls_diff_pos_error.append(self.ls_pos_error[-1] - self.ls_pos_error[-2])
+        self.delta_x = round(self.next_token.x - self.x) 
+        self.delta_y = round(self.next_token.y - self.y) 
+        self.error_to_goal = bound(np.hypot(self.delta_x,self.delta_y) / self.shortest_route,0,2)
+        self.closeness.append( 1 - self.error_to_goal)
+        # if len(self.ls_pos_error) > 1:
+        #     self.ls_diff_pos_error.append(self.ls_pos_error[-1] - self.ls_pos_error[-2])
 
         if self.next_token not in self.tokens_locations:
             self.need_next_token = True
@@ -269,10 +283,17 @@ class Robot:
         
     def update_state(self):
         self.get_reference_position()
-        norm = np.linalg.norm(np.array([self.delta_x,self.delta_y]))
-        x = round(self.delta_x / norm,2)
-        y = round(self.delta_y / norm,2)
-        self.state = np.array([x,y,round(self.theta/math.pi,2), *self.sensor]).reshape(-1,1)
+        # norm = np.linalg.norm(np.array([self.delta_x,self.delta_y]))
+        error = round(self.error_to_goal,2)
+        posx = round(self.x/MAP_SIZE[0],2)
+        posy = round(self.y/MAP_SIZE[1],2)
+        vl = round(self.vl/self.maxspeed,2)
+        vr = round(self.vr/self.maxspeed,2)
+        theta = round(self.theta/math.pi,2)
+        omega = round(self.omega/(2*math.pi))
+        self.state = np.array([vl,vr,error,theta,omega, *self.sensor[1:]]).reshape(-1,1)
+        # if self.id == 1:
+        #     print(self.state)
         return
         
     def get_tokens(self, t):
@@ -361,24 +382,34 @@ class Robot:
         return
     
     def get_reward(self):
-        getting_closer = [abs(diff) for diff in self.ls_diff_pos_error if diff <= 0]
         quicknes = []
+        closeness = sum(self.closeness)
         if self.time_stamps:
             time_between_tokens = [self.time_stamps[0]]
             for i, _ in enumerate(self.time_stamps[1:]):
-                time_between_tokens.append(self.time_stamps[i] - self.time_stamps[i-1])
+                time_between_tokens.append(abs(self.time_stamps[i] - self.time_stamps[i-1]))
             quicknes = [1/time for time in time_between_tokens]
-            # print(sum(quicknes), sum(getting_closer))
-        return round(
-             25*self.token 
+        w_token = 30
+        w_quickness = 50
+        w_closeness = 0.05
+        w_collisions = 0.01
+
+        fitness = round(
+            w_token*self.token 
             # + 5*sum(getting_closer)
-            + 10*sum(quicknes)
+            + w_quickness*sum(quicknes)
             # + len(self.visited_cells)*0.3
-            # - self.collision*0.1
-            #- sum(self.ls_pos_error)*0.1
+            + closeness*w_closeness
+            + self.collision*w_collisions
+            # - sum(self.ls_pos_error)*0.1
             # - self.same_cell*0.05
             # - 3*(self.dist_travelled/self.m2p) 
             ,2)
+        print(f"-------{self.id}--------")
+        print(f"T: {self.token*w_token}, Q: {sum(quicknes*w_quickness)}, \
+              Clo: {closeness*w_closeness}, Col: {self.collision*w_collisions}")
+        print(f"Fitness: {fitness}")
+        return fitness
     
     # def get_reward(self):
     #     return (self.dist_travelled/self.m2p) * (1+self.token) - (self.collision/len(self.visited_cells))
