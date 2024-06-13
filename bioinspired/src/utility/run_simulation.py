@@ -67,7 +67,7 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
         else:
             special = False
         ls_robots.append(
-            Robot(robot_id=i, startpos=(wm.start_pos.x, wm.start_pos.y), width=20, 
+            Robot(robot_id=i, startpos=(wm.start_pos.x, wm.start_pos.y), endpos=wm.end_pos, width=20, 
                   chromosome=pop[i], token_locations=wm.tokens.copy(), special_flag=special)
         )
 
@@ -95,6 +95,8 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
             token_to_collect = robot.get_tokens(timestamp)
             if token_to_collect not in tokens_collected:
                 tokens_collected.append(token_to_collect)
+            if robot.found_all_tokens:
+                robot.get_end_tile()
             robot.move(robot.get_collision(nearby_obstacles), dt, auto=True)
             robot.draw(wm.surf)
 

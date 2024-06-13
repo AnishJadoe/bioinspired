@@ -63,6 +63,10 @@ class WorldMap:
                     self._draw_start_position(obj)
                     self.start_pos = obj
                     self.binary_map[x][y] = 0
+                if char == "E":
+                    self._draw_end_position(obj)
+                    self.end_pos = obj
+                    self.binary_map[x][y] = 0
         return
             
     def _draw_wall(self, obj):
@@ -77,10 +81,14 @@ class WorldMap:
     def _draw_start_position(self, obj: pygame.Rect):
         pygame.draw.rect(self.surf, RED, obj)
     
+    def _draw_end_position(self, obj):
+        pygame.draw.rect(self.surf, ORANGE, obj)
+    
     def update_map(self):
 
         self.surf.fill(WHITE)
         self._draw_start_position(self.start_pos)
+        self._draw_end_position(self.end_pos)
         for wall in self.walls:
             self._draw_wall(wall)
         for token in self.tokens:

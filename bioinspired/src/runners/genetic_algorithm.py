@@ -15,7 +15,7 @@ class GeneticAlgorithmRunner:
     parameters can be changed as needed
     """
 
-    def __init__(self, n_robots, epochs, run_time, cross_rate, mut_rate):
+    def __init__(self, n_robots, epochs, run_time, cross_rate, mut_rate, seed):
         """Initialization of the class
 
         Args:
@@ -32,6 +32,7 @@ class GeneticAlgorithmRunner:
         self.best_agent = self.pop[0]
         self.gen = 1
         self.run_time = run_time
+        self.seed = seed
         
         self.best_fitness = [10,9,8,7,6,5,4,3,2]
         self.best_individuals = list()
@@ -213,6 +214,10 @@ class GeneticAlgorithmRunner:
             self.pop = children[:self.n_robots+1]
             self.gen += 1
             print(f"Size of cache is {cache_size_kb()/1000} MB")
+            if self.gen % 10 == 0: # Save every 10 generations
+                self.save_run()
+                
+        self.save_run()
 
         return
 
@@ -233,8 +238,10 @@ class GeneticAlgorithmRunner:
 
         self.results[self.gen] = results_this_gen
 
-    def save_run(self, folder, run_name):
+    def save_run(self):
         self.world_map = []  # Can't save pygame surface
+        folder = f"saved_runs/n_robots_{self.n_robots}/epochs_{self.gen}/epoch_time_{self.run_time}/seed_{self.seed}/neurons_{N_HIDDEN}"
+        run_name = f"{self.mut_rate}mut_{self.cross_rate}cross.pkl"
         os.makedirs(folder, exist_ok=True)
         with open(f"{folder}/{run_name}", "wb") as f:
             pickle.dump(self, f)

@@ -9,7 +9,7 @@ from src.utility.constants import *
 # seeds = [30,42,50,70,80,100]
 seeds = [30]
 epochs = 250
-time = 30 * 1000 # milliseconds
+time = 60 * 1000 # milliseconds
 n_robots = 80
 ls_cross_rate = [1]
 ls_mut_rate = [0.8] 
@@ -24,11 +24,9 @@ for seed in seeds:
                 run_time=time,
                 cross_rate=cross_rate,
                 mut_rate=mut_rate,
+                seed=seed
             )
             GA.run()
-            FOLDER = f"saved_runs/n_robots_{n_robots}/epochs_{epochs}/epoch_time_{time}/seed_{seed}/neurons_{N_HIDDEN}"
-            GA.save_run(folder=FOLDER, 
-                        run_name=f"{mut_rate}mut_{cross_rate}cross.pkl")
 
 
 

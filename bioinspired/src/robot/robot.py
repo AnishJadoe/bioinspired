@@ -40,17 +40,17 @@ def find_closest_cell(agent_location, cells):
     return closest_index
 
 class Robot:
-    def __init__(self,  startpos, width, chromosome, token_locations, special_flag,robot_id=1):
+    def __init__(self,  startpos,endpos, width, chromosome, token_locations, special_flag,robot_id=1):
         self.id = robot_id + 1
         self.chromosome = chromosome
         self.controller = NeuralNet(n_inputs=N_INPUTS,n_outputs=N_OUTPUTS,n_hidden=N_HIDDEN,chromosome=self.chromosome)
         self.m2p = 3779.52  # meters 2 pixels
         self.w = width * 20
         self.tokens_locations = token_locations
-
         self.init_pos = startpos
         self.x = startpos[0]
         self.y = startpos[1]
+        self.endpos = endpos
         self.vx = 0
         self.vy = 0
         self.current_cell = (self.x // CELL_SIZE, self.y // CELL_SIZE)
@@ -58,6 +58,9 @@ class Robot:
         self.delta_y = 0 # difference between current y and desired y
         self.error_to_goal = 0
         self.theta = 0
+
+        self.found_all_tokens = False
+        self.reached_end = False
         
         self.vl = 0
         self.vr = 0
@@ -264,18 +267,21 @@ class Robot:
         
     def get_reference_position(self):
             
-        if self.need_next_token:
+        if self.need_next_token and not self.found_all_tokens:
             closest_cell_index = find_closest_cell((self.x // CELL_SIZE, self.y // CELL_SIZE), self.tokens_locations)
             self.next_token = self.tokens_locations[closest_cell_index]
             self.shortest_route = round(calc_distance((self.x ,self.y), (self.next_token.x,self.next_token.y)))
             self.need_next_token = False
-        
+        elif self.found_all_tokens:
+            self.next_token = self.endpos
+            self.shortest_route = round(calc_distance((self.x ,self.y), (self.next_token.x,self.next_token.y)))
+            self.need_next_token = False
+
         self.delta_x = round(self.next_token.x - self.x) 
         self.delta_y = round(self.next_token.y - self.y) 
         self.error_to_goal = bound(np.hypot(self.delta_x,self.delta_y) / self.shortest_route,0,2)
         self.closeness.append( 1 - self.error_to_goal)
-        # if len(self.ls_pos_error) > 1:
-        #     self.ls_diff_pos_error.append(self.ls_pos_error[-1] - self.ls_pos_error[-2])
+
 
         if self.next_token not in self.tokens_locations:
             self.need_next_token = True
@@ -283,17 +289,12 @@ class Robot:
         
     def update_state(self):
         self.get_reference_position()
-        # norm = np.linalg.norm(np.array([self.delta_x,self.delta_y]))
         error = round(self.error_to_goal,2)
-        posx = round(self.x/MAP_SIZE[0],2)
-        posy = round(self.y/MAP_SIZE[1],2)
         vl = round(self.vl/self.maxspeed,2)
         vr = round(self.vr/self.maxspeed,2)
         theta = round(self.theta/math.pi,2)
         omega = round(self.omega/(2*math.pi))
         self.state = np.array([vl,vr,error,theta,omega, *self.sensor[1:]]).reshape(-1,1)
-        # if self.id == 1:
-        #     print(self.state)
         return
         
     def get_tokens(self, t):
@@ -301,6 +302,10 @@ class Robot:
         Function to check if we have collided with a token, when this happens the
         robot obtains a token
         '''
+        if len(self.tokens_locations) == 0:
+            # Found all Tokens
+            self.found_all_tokens = True
+            return
         token_collected = self.hitbox.collidelist(self.tokens_locations) 
         if token_collected == -1:
             return self.next_token
@@ -309,6 +314,15 @@ class Robot:
             self.time_stamps.append(t)
             self.tokens_locations.pop(token_collected)
         return self.next_token
+
+    def get_end_tile(self):
+        found_end_tile = self.hitbox.collidelist([self.endpos])
+        if found_end_tile == -1:
+            return
+        else:
+            print("Found the final tile!!")
+            self.reached_end = True 
+
 
     def move(self, wall_collided, dt, event=None, auto=False):
         self.ls_x.append(self.x)
@@ -401,6 +415,7 @@ class Robot:
             # + len(self.visited_cells)*0.3
             + closeness*w_closeness
             + self.collision*w_collisions
+            + 1000*self.reached_end
             # - sum(self.ls_pos_error)*0.1
             # - self.same_cell*0.05
             # - 3*(self.dist_travelled/self.m2p) 
