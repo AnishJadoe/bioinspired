@@ -9,6 +9,8 @@ from ..world_map.txt_to_map import WorldMap
 from ..utility.constants import *
 from ..robot.neural_net import NeuralNet
 
+
+
 def bound(value, low, high):
     return max(low, min(high, value))
 
@@ -117,7 +119,6 @@ class Robot:
             self.base_img = pygame.image.load(r"bioinspired/src/robot/images/robot_one.png")
             self.base_img = pygame.transform.scale(self.base_img, (self.width, self.length))
             self.base_img = pygame.transform.rotate(self.base_img, 0)
-            
         else:   
             self.base_img = pygame.image.load(r"bioinspired/src/robot/images/robot_normal.png")
             self.base_img = pygame.transform.scale(self.base_img, (self.width, self.length))
@@ -131,6 +132,18 @@ class Robot:
         self.sensor_off_img = pygame.image.load(r"bioinspired/src/robot/images/distance_sensor_off.png")
         self.sensor_on_img = pygame.transform.scale(self.sensor_on_img,(20,100))
         self.sensor_off_img = pygame.transform.scale(self.sensor_off_img,(20,100))
+
+    def scale_action(self, action):
+        """
+        Scales the action output from the neural network to the motor speed range.
+
+        Parameters:
+            action (float): The action output from the neural network.
+
+        Returns:
+            float: The scaled motor speed.
+        """
+        return (action + 0.5) * (self.maxspeed - self.minspeed) + self.minspeed
 
     def _attitude(self):
         return(self.x,self.y,math.degrees(self.theta))
@@ -199,9 +212,11 @@ class Robot:
                                                  math.degrees(-self.theta), 1)
         self.hitbox = self.trans_img.get_rect(center=(self.x, self.y))
         world.blit(self.trans_img, self.hitbox)
-        # img = font.render(f'ID: {self.id}', True, (0,0,0))
-        # world.blit(img,(self.x,self.y-20))    
-
+  
+    def draw_robot_id(self,world):
+        font = pygame.font.SysFont(None, 24)
+        img = font.render(f'ID: {self.id}', True, (0,0,0))
+        world.blit(img,(self.x,self.y-20))  
     # def draw_next_token(self,world):
     #     pygame.draw.rect(world,BLUE, self.next_token)
 
@@ -279,8 +294,8 @@ class Robot:
 
         self.delta_x = round(self.next_token.x - self.x) 
         self.delta_y = round(self.next_token.y - self.y) 
-        self.error_to_goal = bound(np.hypot(self.delta_x,self.delta_y) / self.shortest_route,0,2)
-        self.closeness.append( 1 - self.error_to_goal)
+        self.error_to_goal = 1 - bound(np.hypot(self.delta_x,self.delta_y) / self.shortest_route,0,2)
+        self.closeness.append(self.error_to_goal)
 
 
         if self.next_token not in self.tokens_locations:
@@ -339,8 +354,8 @@ class Robot:
             # index = np.where((self.all_states == self.sensor).all(axis=1))[0][0]
             # actions = self.chromosome[index]
             actions = self.get_action()
-            self.vl = min(self.maxspeed, max(self.minspeed, actions[0,:][0]) )
-            self.vr = min(self.maxspeed, max(self.minspeed, actions[1,:][0]) )
+            self.vl = np.clip(self.scale_action(actions[0, 0]), self.minspeed, self.maxspeed)
+            self.vr = np.clip(self.scale_action(actions[1, 0]), self.minspeed, self.maxspeed)
         elif event:
             if event.type in {pygame.KEYDOWN, pygame.KEYUP}:
                 if event.key == pygame.locals.K_a:
@@ -395,6 +410,7 @@ class Robot:
 
         return
     
+    
     def get_reward(self):
         quicknes = []
         closeness = sum(self.closeness)
@@ -403,7 +419,7 @@ class Robot:
             for i, _ in enumerate(self.time_stamps[1:]):
                 time_between_tokens.append(abs(self.time_stamps[i] - self.time_stamps[i-1]))
             quicknes = [1/time for time in time_between_tokens]
-        w_token = 30
+        w_token = 100
         w_quickness = 50
         w_closeness = 0.05
         w_collisions = 0.01

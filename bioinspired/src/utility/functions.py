@@ -35,15 +35,34 @@ def get_init_chromosomes_heuristic(n_robots):
         population.append(np.random.randint(low=-255, high=255, size=(64, 2)))
     return population
 
-def get_init_chromosomes_NN(n_robots, n_inputs,n_outputs,n_hidden):
-    np.random.seed(42)
-    population = list()
-    n_weights = n_inputs*n_hidden + n_hidden*n_outputs 
-    n_bias =  n_hidden + n_outputs
-    for i in range(0,n_robots):
-        weights = np.random.uniform(low=-128,high=128, size=(n_weights,1))
-        biases = np.random.uniform(low=-128,high=128, size=(n_bias,1))
-        population.append(np.vstack((weights, biases)))
+def get_init_chromosomes_NN(n_robots, n_inputs, n_outputs, n_hidden, seed=42):
+    """
+    Initializes a population of chromosomes for a neural network.
+
+    Parameters:
+        n_robots (int): Number of robots (population size).
+        n_inputs (int): Number of input neurons.
+        n_outputs (int): Number of output neurons.
+        n_hidden (int): Number of hidden neurons.
+        seed (int, optional): Seed for the random number generator. Default is 42.
+
+    Returns:
+        list: List of chromosomes, where each chromosome is a numpy array containing the weights and biases.
+    """
+    np.random.seed(seed)
+    population = []
+    
+    n_weights = n_inputs * n_hidden + n_hidden * n_outputs
+    n_biases = n_hidden + n_outputs
+    
+    # Using uniform distribution in the range [-0.5, 0.5]
+    weight_range = 0.5
+    
+    for _ in range(n_robots):
+        weights = np.random.uniform(low=-weight_range, high=weight_range, size=n_weights)
+        biases = np.random.uniform(low=-weight_range, high=weight_range, size=n_biases)
+        chromosome = np.concatenate((weights, biases))
+        population.append(chromosome)
         
     return population
     

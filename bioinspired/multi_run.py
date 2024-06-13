@@ -1,6 +1,6 @@
 import pickle
 from src.world_map.txt_to_map import WorldMap
-from src.utility.run_simulation import single_agent_run
+from src.utility.run_simulation import multi_agent_run
 from src.utility.functions import load_GAs
 
 FOLDER = r"saved_runs\n_robots_100\epochs_300\epoch_time_30000\seed_30\neurons_8"
@@ -12,4 +12,4 @@ all_fitness = [GA.best_eval for GA in GAs]
 best_fitness_index = all_fitness.index(max(all_fitness))
 best_run = GAs[best_fitness_index]
 
-single_agent_run(wm,300000,best_run.best_agent)
+multi_agent_run(wm,300000,best_run.best_individuals)

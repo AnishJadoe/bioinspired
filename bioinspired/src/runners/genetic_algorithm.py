@@ -34,7 +34,7 @@ class GeneticAlgorithmRunner:
         self.run_time = run_time
         self.seed = seed
         
-        self.best_fitness = [10,9,8,7,6,5,4,3,2]
+        self.best_fitness = list()
         self.best_individuals = list()
 
         self.cross_rate = cross_rate
@@ -49,6 +49,9 @@ class GeneticAlgorithmRunner:
         self.token_gen = list()
         self.results = dict()
         self.all_populations = dict()
+
+        self.best_fitness_set= set()
+        self.best_individual_set= set()
 
     def best_fit_selection(self):  # k=5
         """The selection operator used for this algorithm, it takes the best 20%
@@ -147,20 +150,54 @@ class GeneticAlgorithmRunner:
         return [child1.reshape(parent1.shape), child2.reshape(parent2.shape)]
         
     def get_best_individuals(self):
-        best_individuals = list()
-        index = min(-1, -math.floor(self.n_robots * 0.10))  # take best 10%
-        elitst_children = np.argsort(np.array(self.fitness))[index:]
-        for index in elitst_children:
-            check_fitness = list(self.fitness[index] >= self.best_fitness)
-            if sum(check_fitness):
-                index_fitness = check_fitness.index(True)
-                if index_fitness <= len(self.best_fitness):
-                    self.best_fitness.insert(index_fitness, self.fitness[index])
-                    self.best_individuals.extend([self.pop[index]])
-                    self.best_fitness = self.best_fitness[:len(elitst_children)]
-                    self.best_individuals = self.best_individuals[:len(elitst_children)]
-        print(f"Current best individuals have fitenss {self.best_fitness} ")
-        return best_individuals
+
+        # Number of elite individuals to select (top 10%)
+        num_elite = max(1, math.ceil(self.n_robots * 0.10))
+
+        # Get indices of sorted fitness values in descending order
+        sorted_indices = np.argsort(self.fitness)[::-1]
+
+        # Select the top 10% individuals
+        elitist_children = sorted_indices[:num_elite]
+
+        for index in elitist_children:
+            fitness_value = self.fitness[index]
+            individual_str = str(self.pop[index].tolist())  # Convert individual to string for comparison
+            
+            if fitness_value not in self.best_fitness_set and individual_str not in self.best_individual_set:
+                if len(self.best_fitness) < num_elite:
+                    # Add to best lists if they are not full
+                    self.best_fitness.append(fitness_value)
+                    self.best_individuals.append(self.pop[index])
+                    self.best_fitness_set.add(fitness_value)
+                    self.best_individual_set.add(individual_str)
+                else:
+                    # Replace the worst in the best lists if current individual is better
+                    min_fitness_index = np.argmin(self.best_fitness)
+                    if fitness_value > self.best_fitness[min_fitness_index]:
+                        removed_fitness = self.best_fitness[min_fitness_index]
+                        removed_individual = str(self.best_individuals[min_fitness_index].tolist())
+                        
+                        self.best_fitness[min_fitness_index] = fitness_value
+                        self.best_individuals[min_fitness_index] = self.pop[index]
+                        
+                        # Update sets
+                        self.best_fitness_set.remove(removed_fitness)
+                        self.best_individual_set.remove(removed_individual)
+                        
+                        self.best_fitness_set.add(fitness_value)
+                        self.best_individual_set.add(individual_str)
+
+        # Sort best_fitness and best_individuals together based on fitness values
+        best_sorted = sorted(zip(self.best_fitness, self.best_individuals), key=lambda x: x[0], reverse=True)
+
+        # Keep only the top num_elite individuals
+        self.best_fitness, self.best_individuals = zip(*best_sorted[:num_elite])
+        self.best_fitness = list(self.best_fitness)
+        self.best_individuals = list(self.best_individuals)
+
+        print(f"Current best individuals have fitness {self.best_fitness}")
+        return self.best_individuals
 
     def run(self):
         """This is the main loop for the algorithm. First a base score is set-up by running the algorithm with the inital population
@@ -214,9 +251,9 @@ class GeneticAlgorithmRunner:
             self.pop = children[:self.n_robots+1]
             self.gen += 1
             print(f"Size of cache is {cache_size_kb()/1000} MB")
-            if self.gen % 10 == 0: # Save every 10 generations
+            if self.gen % 11 == 0 and epoch != (self.epochs-1): # Save every 10 generations
                 self.save_run()
-                
+
         self.save_run()
 
         return
@@ -240,7 +277,7 @@ class GeneticAlgorithmRunner:
 
     def save_run(self):
         self.world_map = []  # Can't save pygame surface
-        folder = f"saved_runs/n_robots_{self.n_robots}/epochs_{self.gen}/epoch_time_{self.run_time}/seed_{self.seed}/neurons_{N_HIDDEN}"
+        folder = f"saved_runs/n_robots_{self.n_robots}/epochs_{self.gen-1}/epoch_time_{self.run_time}/seed_{self.seed}/neurons_{N_HIDDEN}"
         run_name = f"{self.mut_rate}mut_{self.cross_rate}cross.pkl"
         os.makedirs(folder, exist_ok=True)
         with open(f"{folder}/{run_name}", "wb") as f:

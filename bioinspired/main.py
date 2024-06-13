@@ -8,9 +8,9 @@ from src.runners.genetic_algorithm import GeneticAlgorithmRunner
 from src.utility.constants import *
 # seeds = [30,42,50,70,80,100]
 seeds = [30]
-epochs = 250
-time = 60 * 1000 # milliseconds
-n_robots = 80
+epochs = 500
+time = 45 * 1000 # milliseconds
+n_robots = 100
 ls_cross_rate = [1]
 ls_mut_rate = [0.8] 
 
