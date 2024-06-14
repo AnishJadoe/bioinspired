@@ -78,19 +78,23 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
     running = True
     dt = 0
     tokens_collected = []
+    all_tanks_empty = False
     # Simulation loop
-    while pygame.time.get_ticks() <= (time+loadtime) and running:
+    while not all_tanks_empty and running:
         clock.tick(30)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
         timestamp = (pygame.time.get_ticks()/1000)
         dt = (pygame.time.get_ticks() - lasttime) / 1000
-
+        tanks_empty = [robot.tank_empty for robot in ls_robots]
+        if all(tanks_empty):
+            all_tanks_empty = True
+            continue
         # Update frame by redrawing everything
         wm.update_map()
         for robot in ls_robots:
-            robot.update_state()
+            robot.update_state(timestamp)
             nearby_obstacles = robot.find_position(wm)
             robot.update_sensors(nearby_obstacles,wm)
             token_to_collect = robot.get_tokens(timestamp)
@@ -100,7 +104,7 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
                 robot.get_end_tile()
             robot.move(robot.get_collision(nearby_obstacles), dt, auto=True)
             robot.draw(wm.surf)
-
+   
         draw_next_token(wm.surf, tokens_collected[-1])
         draw_time(wm.surf, (pygame.time.get_ticks()/1000))
         draw_gen(wm.surf,gen)

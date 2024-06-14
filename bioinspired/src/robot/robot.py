@@ -61,6 +61,10 @@ class Robot:
         self.error_to_goal = 0
         self.theta = 0
 
+        self.energy_tank = MAX_ENERGY
+        self.tank_empty = False
+        self.time_tank_empty = 0
+
         self.found_all_tokens = False
         self.reached_end = False
         
@@ -147,6 +151,11 @@ class Robot:
 
     def _attitude(self):
         return(self.x,self.y,math.degrees(self.theta))
+    
+    def draw_tank_percentage(self, world):
+        font = pygame.font.SysFont(None, 24)
+        img = font.render(f'Tank: {round((self.energy_tank/MAX_ENERGY) * 100),1}%', True, (0,0,0))
+        world.blit(img,(self.x,self.y))
     
     def draw_sensor_orientation(self,world):
         for i,sensor in enumerate(self.sensor[1:]):
@@ -236,6 +245,7 @@ class Robot:
         Draws on the world
         '''
         self.draw_robot(world)
+        # self.draw_tank_percentage(world)
         # self.draw_error_to_goal(world)
         # self.draw_next_token(world)
         # self.draw_visited_cells(world)
@@ -279,9 +289,11 @@ class Robot:
         collided_walls = self.hitbox.collidelist(nearby_obstacles)
         if collided_walls != NO_COLLISIONS: # -1 equals no collision:
             self.collision -= 20
+            self.energy_tank = max(self.energy_tank-MAX_ENERGY*0.03, 0)
             self.sensor[0] = 1
             return nearby_obstacles[collided_walls]
         else:
+            self.energy_tank = max(self.energy_tank-MAX_ENERGY*0.005, 0)
             self.collision += 1
             return 0
         
@@ -311,14 +323,19 @@ class Robot:
             self.need_next_token = True
         
         
-    def update_state(self):
+    def update_state(self, t=None):
+        if self.energy_tank <= 0.0 and not self.tank_empty:
+            self.time_tank_empty = t
+            self.tank_empty = True
+
         self.get_reference_position()
         error = round(self.error_to_goal,2)
         vl = round(self.vl/self.maxspeed,2)
         vr = round(self.vr/self.maxspeed,2)
         theta = round(self.theta/math.pi,2)
         omega = round(self.omega/(2*math.pi))
-        self.state = np.array([vl,vr,error,theta,omega, *self.sensor[1:]]).reshape(-1,1)
+        energy = self.energy_tank / MAX_ENERGY
+        self.state = np.array([vl,vr,error,theta,omega,energy, *self.sensor[1:]]).reshape(-1,1)
         return
         
     def get_tokens(self, t):
@@ -335,6 +352,7 @@ class Robot:
             return self.next_token
         if self.next_token == self.tokens_locations[token_collected]:
             self.token += 1
+            self.energy_tank = min(self.energy_tank+MAX_ENERGY*0.25, MAX_ENERGY)
             self.time_stamps.append(t)
             self.tokens_locations.pop(token_collected)
         return self.next_token
@@ -349,15 +367,18 @@ class Robot:
 
 
     def move(self, wall_collided, dt, event=None, auto=False):
+        if self.tank_empty or self.found_all_tokens:
+            return
+        
         self.ls_x.append(self.x)
         self.ls_y.append(self.y)
         self.ls_theta.append(self.theta)
-
         if len(self.ls_x) >= 2:
             delta_x = self.ls_x[-2] - self.ls_x[-1]
             delta_y = self.ls_y[-2] - self.ls_y[-1]
             delta_r = np.hypot(delta_x, delta_y)  # Efficient calculation of sqrt(delta_x^2 + delta_y^2)
             self.dist_travelled += delta_r
+            self.energy_tank = max(self.energy_tank-(delta_r/2), 0)
 
         if auto:
             # index = np.where((self.all_states == self.sensor).all(axis=1))[0][0]
@@ -438,13 +459,14 @@ class Robot:
             + closeness*W_CLOSE
             + self.collision*W_COL
             + 1000*self.reached_end
+            + (self.time_tank_empty)
             # - sum(self.ls_pos_error)*0.1
             # - self.same_cell*0.05
             # - 3*(self.dist_travelled/self.m2p) 
             ,2)
         print(f"-------{self.id}--------")
         print(f"T: {self.token*W_TOKEN}, Q: {sum(quicknes*W_QUICK)}, \
-              Clo: {closeness*W_CLOSE}, Col: {self.collision*W_COL}")
+              Clo: {closeness*W_CLOSE}, Col: {self.collision*W_COL}, Time: {(self.time_tank_empty)}")
         print(f"Fitness: {fitness}")
         return fitness
     
