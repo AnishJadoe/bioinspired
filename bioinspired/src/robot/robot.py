@@ -217,17 +217,26 @@ class Robot:
         font = pygame.font.SysFont(None, 24)
         img = font.render(f'ID: {self.id}', True, (0,0,0))
         world.blit(img,(self.x,self.y-20))  
+    
+    def draw_error_to_goal(self,world):
+        font = pygame.font.SysFont(None, 24)
+        img = font.render(f'Error: {round(self.error_to_goal,2)}', True, (0,0,0))
+        world.blit(img,(self.x,self.y-20)) 
     # def draw_next_token(self,world):
     #     pygame.draw.rect(world,BLUE, self.next_token)
 
     def draw_robot_bb(self,world):
         pygame.draw.rect(world,RED,self.hitbox, width=1)
-        
+    
+    def draw_next_token(self,world):
+        pygame.draw.line(world,BLUE, (self.x,self.y), (self.next_token.x,self.next_token.y))
+
     def draw(self, world):
         '''
         Draws on the world
         '''
         self.draw_robot(world)
+        # self.draw_error_to_goal(world)
         # self.draw_next_token(world)
         # self.draw_visited_cells(world)
         # self.draw_robot_bb(world)
@@ -294,7 +303,7 @@ class Robot:
 
         self.delta_x = round(self.next_token.x - self.x) 
         self.delta_y = round(self.next_token.y - self.y) 
-        self.error_to_goal = 1 - bound(np.hypot(self.delta_x,self.delta_y) / self.shortest_route,0,2)
+        self.error_to_goal = 1 - bound(np.hypot(self.delta_x,self.delta_y) / self.shortest_route,0,4)
         self.closeness.append(self.error_to_goal)
 
 
@@ -419,26 +428,23 @@ class Robot:
             for i, _ in enumerate(self.time_stamps[1:]):
                 time_between_tokens.append(abs(self.time_stamps[i] - self.time_stamps[i-1]))
             quicknes = [1/time for time in time_between_tokens]
-        w_token = 100
-        w_quickness = 50
-        w_closeness = 0.05
-        w_collisions = 0.01
+
 
         fitness = round(
-            w_token*self.token 
+            W_TOKEN*self.token 
             # + 5*sum(getting_closer)
-            + w_quickness*sum(quicknes)
+            + W_QUICK*sum(quicknes)
             # + len(self.visited_cells)*0.3
-            + closeness*w_closeness
-            + self.collision*w_collisions
+            + closeness*W_CLOSE
+            + self.collision*W_COL
             + 1000*self.reached_end
             # - sum(self.ls_pos_error)*0.1
             # - self.same_cell*0.05
             # - 3*(self.dist_travelled/self.m2p) 
             ,2)
         print(f"-------{self.id}--------")
-        print(f"T: {self.token*w_token}, Q: {sum(quicknes*w_quickness)}, \
-              Clo: {closeness*w_closeness}, Col: {self.collision*w_collisions}")
+        print(f"T: {self.token*W_TOKEN}, Q: {sum(quicknes*W_QUICK)}, \
+              Clo: {closeness*W_CLOSE}, Col: {self.collision*W_COL}")
         print(f"Fitness: {fitness}")
         return fitness
     

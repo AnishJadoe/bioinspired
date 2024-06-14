@@ -9,8 +9,8 @@ from src.utility.constants import *
 # seeds = [30,42,50,70,80,100]
 seeds = [30]
 epochs = 500
-time = 45 * 1000 # milliseconds
-n_robots = 100
+time = 30 * 1000 # milliseconds
+n_robots = 80
 ls_cross_rate = [1]
 ls_mut_rate = [0.8] 
 

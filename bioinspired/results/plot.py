@@ -3,6 +3,7 @@ from typing import List
 import matplotlib.pyplot as plt
 import numpy as np
 from src.runners.genetic_algorithm import GeneticAlgorithmRunner
+from src.utility.constants import *
 
 plt.style.use("bmh")
 
@@ -102,9 +103,9 @@ def plot_mean_results(GAs: GeneticAlgorithmRunner):
 
         ax_fitness.hlines(max(fitness), 0,GA.epochs)
         ax_fitness.plot(x, fitness, label=f"Mutation rate = {GA.mut_rate}")
-        ax_collision.plot(x, collisions, label=f"Mutation rate = {GA.mut_rate}")
+        ax_collision.plot(x, collisions*W_COL, label=f"Mutation rate = {GA.mut_rate}")
         ax_abs_distance.plot(x, abs_distance, label=f"Mutation rate = {GA.mut_rate}")
-        ax_token.plot(x, tokens, label=f"Mutation rate = {GA.mut_rate}")
+        ax_token.plot(x, tokens*W_TOKEN, label=f"Mutation rate = {GA.mut_rate}")
         ax_cells_explored.plot(x, cells_explored, label=f"Mutation rate = {GA.mut_rate}")
 
     ax_fitness.legend()
@@ -237,9 +238,9 @@ def plot_best_results(GAs: List[GeneticAlgorithmRunner]):
     for GA in GAs:
         x = range(0, GA.epochs)
         fitness = [np.max(GA.results[key]["fitness"]) for key in GA.results]
-        collisions = [np.min(GA.results[key]["collisions"]) for key in GA.results]
+        collisions = [np.min(GA.results[key]["collisions"]) * W_COL for key in GA.results]
         abs_distance = [np.max(GA.results[key]["abs_dist"] ) / m2p for key in GA.results]
-        tokens = [np.max(GA.results[key]["tokens"]) for key in GA.results]
+        tokens = [np.max(GA.results[key]["tokens"]) * W_TOKEN for key in GA.results]
         cells_explored = [np.max(GA.results[key]["cells_explored"]) for key in GA.results]
 
 

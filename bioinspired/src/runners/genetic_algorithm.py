@@ -111,8 +111,38 @@ class GeneticAlgorithmRunner:
         """
         random_choice = np.random.sample()
         if self.mut_rate > random_choice:
-            idx1, idx2 = np.random.randint(0, individual.size, 2)
-            individual.flat[idx1], individual.flat[idx2] = individual.flat[idx2], individual.flat[idx1]
+            # Two different types of mutation
+            mutation_type = np.random.sample()
+            if mutation_type >= 0.0 and mutation_type < 0.3:
+                # Gene Swap
+                idx1, idx2 = np.random.randint(0, individual.size, 2)
+                individual.flat[idx1], individual.flat[idx2] = individual.flat[idx2], individual.flat[idx1]
+            elif mutation_type >= 0.3 and mutation_type < 0.5:
+                # Gene Inversion
+                idx1, idx2 = np.random.randint(0, individual.size, 2)
+                if idx1 < idx2:
+                    inverted = reversed(individual.flat[idx1:idx2])
+                    individual.flat[idx1:idx2] = list(inverted)
+                else:
+                    inverted = reversed(individual.flat[idx2:idx1])
+                    individual.flat[idx2:idx1] = list(inverted)
+
+            elif mutation_type >= 0.5 and mutation_type < 0.7:
+                # Scramble Mutation
+                idx1, idx2 = np.random.randint(0, individual.size, 2)
+                if idx1 < idx2:
+                    scramble = individual.flat[idx1:idx2]
+                    random.shuffle(scramble)
+                    individual.flat[idx1:idx2] = scramble
+                else:
+                    scramble = individual.flat[idx2:idx1]
+                    random.shuffle(scramble)
+                    individual.flat[idx2:idx1] = scramble
+            else:
+                # Random Resetting
+                idx1 = np.random.randint(0,individual.size,1)
+                weight_range = WEIGHT_RANGE
+                individual.flat[idx1] = np.random.uniform(low=-weight_range, high=weight_range,size=1)
         return individual
 
 
