@@ -22,7 +22,7 @@ YELLOW = (255, 255, 0, 255)
 BLACK = (0, 0, 0, 255)
 
 # Weights
-W_TOKEN = 10
+W_TOKEN = 25
 W_QUICK = 3
 W_CLOSE = 0.05
 W_COL = 0.01

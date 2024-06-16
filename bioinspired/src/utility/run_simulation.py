@@ -28,7 +28,7 @@ def draw_time(world, time):
 def draw_gen(world, gen):
     font = pygame.font.SysFont(None, 24)
     txt = font.render(f'Gen: {gen}', True, BLUE)
-    world.blit(txt,(750,75))
+    world.blit(txt,(800,75))
 
 def draw_next_token(world, token):
     pygame.draw.rect(world,BLUE, token)

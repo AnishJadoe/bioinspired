@@ -2,7 +2,7 @@ from src.utility.functions import load_GAs
 from results.plot import plot_mean_results, plot_best_results, plot_aggregate_results
 
 
-FOLDER = r"saved_runs\n_robots_100\epochs_300\epoch_time_30000\seed_30\neurons_8"
+FOLDER = r"saved_runs\n_robots_80/epochs_500"
 GAs = []
 GAs = load_GAs(GAs,FOLDER)
 

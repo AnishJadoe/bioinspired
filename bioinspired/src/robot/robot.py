@@ -217,6 +217,11 @@ class Robot:
         world.blit(img,(self.x,self.y))  
 
     def draw_robot(self,world, debug=False):
+        # if self.tank_empty:
+        #     self.base_img = pygame.image.load(r"bioinspired/src/robot/images/robot_dead.png")
+            # self.base_img = pygame.transform.scale(self.base_img, (self.width, self.length))
+            # self.base_img = pygame.transform.rotate(self.base_img, 0)
+
         self.trans_img = pygame.transform.rotozoom(self.base_img,
                                                  math.degrees(-self.theta), 1)
         self.hitbox = self.trans_img.get_rect(center=(self.x, self.y))
@@ -289,11 +294,11 @@ class Robot:
         collided_walls = self.hitbox.collidelist(nearby_obstacles)
         if collided_walls != NO_COLLISIONS: # -1 equals no collision:
             self.collision -= 20
-            self.energy_tank = max(self.energy_tank-MAX_ENERGY*0.03, 0)
+            self.energy_tank = max(self.energy_tank-MAX_ENERGY*0.05, 0)
             self.sensor[0] = 1
             return nearby_obstacles[collided_walls]
         else:
-            self.energy_tank = max(self.energy_tank-MAX_ENERGY*0.005, 0)
+            self.energy_tank = max(self.energy_tank-MAX_ENERGY*0.001, 0)
             self.collision += 1
             return 0
         
@@ -352,7 +357,7 @@ class Robot:
             return self.next_token
         if self.next_token == self.tokens_locations[token_collected]:
             self.token += 1
-            self.energy_tank = min(self.energy_tank+MAX_ENERGY*0.25, MAX_ENERGY)
+            self.energy_tank = min(self.energy_tank+MAX_ENERGY*0.5, MAX_ENERGY)
             self.time_stamps.append(t)
             self.tokens_locations.pop(token_collected)
         return self.next_token
@@ -378,7 +383,7 @@ class Robot:
             delta_y = self.ls_y[-2] - self.ls_y[-1]
             delta_r = np.hypot(delta_x, delta_y)  # Efficient calculation of sqrt(delta_x^2 + delta_y^2)
             self.dist_travelled += delta_r
-            self.energy_tank = max(self.energy_tank-(delta_r/2), 0)
+            self.energy_tank = max(self.energy_tank-(delta_r/10), 0)
 
         if auto:
             # index = np.where((self.all_states == self.sensor).all(axis=1))[0][0]
@@ -456,8 +461,8 @@ class Robot:
             # + 5*sum(getting_closer)
             + W_QUICK*sum(quicknes)
             # + len(self.visited_cells)*0.3
-            + closeness*W_CLOSE
-            + self.collision*W_COL
+            # + closeness*W_CLOSE
+            # + self.collision*W_COL
             + 1000*self.reached_end
             + (self.time_tank_empty)
             # - sum(self.ls_pos_error)*0.1
