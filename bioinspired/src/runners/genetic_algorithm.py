@@ -242,7 +242,7 @@ class GeneticAlgorithmRunner:
             print(f"GENERATION: {self.gen}")
             self._save_population()
             # Build world
-            wm = WorldMap(skeleton_file="bioinspired/src/world_map/maps/follow_token_map.txt", 
+            wm = WorldMap(skeleton_file="bioinspired/src/world_map/maps/maze_map.txt", 
                           map_width=MAP_DIMS[0], map_height=MAP_DIMS[1], tile_size=CELL_SIZE)
             population_results = run_simulation(
                 wm, self.run_time, self.pop, self.n_robots, self.gen
@@ -281,7 +281,7 @@ class GeneticAlgorithmRunner:
             self.pop = children[:self.n_robots+1]
             self.gen += 1
             print(f"Size of cache is {cache_size_kb()/1000} MB")
-            if self.gen % 11 == 0 and epoch != (self.epochs-1): # Save every 10 generations
+            if self.gen % 50 == 0 and epoch != (self.epochs-1): # Save every 10 generations
                 self.save_run()
 
         self.save_run()

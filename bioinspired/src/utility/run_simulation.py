@@ -178,7 +178,7 @@ def multi_agent_run(wm: WorldMap, time, chromosomes):
     ls_robots = list()
     for chromosome in chromosomes:
         ls_robots.append(Robot((wm.start_pos.x, wm.start_pos.y),endpos=wm.end_pos, width=20, 
-                    chromosome=chromosome, token_locations=wm.tokens, special_flag=True))
+                    chromosome=chromosome, token_locations=wm.tokens.copy(), special_flag=True))
     running = True
     dt = 0
     tokens_collected = []
