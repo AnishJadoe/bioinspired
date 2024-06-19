@@ -83,7 +83,7 @@ def calc_distance(coord1, coord2):
     return dist
 
 angle_cache = {}
-def calc_angle(v1, v2):
+def calc_angle(v1, v2, cache=False):
     """Calculate the orientation of 2 points with respect to each other.
 
     Args:
@@ -94,7 +94,7 @@ def calc_angle(v1, v2):
         float: The orientation angle in radians.
     """
  
-    if (v1, v2) in angle_cache:
+    if (v1, v2) in angle_cache and cache:
         return angle_cache[(v1, v2)]
     
     # Normalize both direction vectors
@@ -112,7 +112,8 @@ def calc_angle(v1, v2):
     # Determine the sign of the angle
     if cross_product < 0:
         angle *= -1
-    angle_cache[(v1, v2)] = angle
+    if cache:
+        angle_cache[(v1, v2)] = angle
     return angle
 
 def cache_size():

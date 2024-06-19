@@ -110,7 +110,8 @@ class Robot:
         theta = round(self.theta/math.pi,2)
         omega = round(self.omega/(2*math.pi))
         energy = self.energy_tank / MAX_ENERGY
-        self.state = np.array([self.delta_x,self.delta_y,theta,*self.sensor[1:]]).reshape(-1,1)
+        self.angle_w_next_token = 0
+        self.state = np.array([self.error_to_goal,self.angle_w_next_token,theta,energy,*self.sensor[1:]]).reshape(-1,1)
 
         self.width = width 
         self.length = width 
@@ -202,17 +203,21 @@ class Robot:
                 (self.x+math.cos(self.theta+math.radians(sensor_angle - self.sensor_sweep))*self.sensor_range,
                 self.y+math.sin(self.theta+math.radians(sensor_angle - self.sensor_sweep))*self.sensor_range),width=6)
 
-    def debug_theta(self,world):
+    def draw_motor_speed(self,world):
         font = pygame.font.SysFont(None, 24)
-        # img = font.render(f'theta: {round(math.degrees(self.theta),1)}', True, (0,0,0))
-        # world.blit(img,(self.x,self.y))
         img = font.render(f'vr: {round(self.vr,2)}' , True, (0,0,0))
         world.blit(img,(400,300))
         img = font.render(f'vl: {round(self.vl,2)}', True, (0,0,0))
         world.blit(img,(400,200))
-        # pygame.draw.line(world, RED, (self.x, self.y), 
-        # (self.x+math.cos(self.theta)*self.sensor_range,
-        # self.y+math.sin(self.theta)*self.sensor_range),width=2)
+
+    def debug_theta(self,world):
+        font = pygame.font.SysFont(None, 24)
+        # img = font.render(f'theta: {round(math.degrees(self.theta),1)}', True, (0,0,0))
+        # world.blit(img,(self.x,self.y))
+
+        pygame.draw.line(world, RED, (self.x, self.y), 
+        (self.x+math.cos(self.theta)*self.sensor_range,
+        self.y+math.sin(self.theta)*self.sensor_range),width=2)
 
 
     def debug_token(self,world):
@@ -251,6 +256,11 @@ class Robot:
         font = pygame.font.SysFont(None, 24)
         img = font.render(f'Error: {round(self.error_to_goal,2)}', True, (0,0,0))
         world.blit(img,(self.x,self.y-20)) 
+        
+    def draw_angle_to_next_token(self,world):
+        font = pygame.font.SysFont(None, 24)
+        img = font.render(f'Angle: {round(math.degrees(self.angle_w_next_token),2)}', True, (0,0,0))
+        world.blit(img,(self.x,self.y-20)) 
     # def draw_next_token(self,world):
     #     pygame.draw.rect(world,BLUE, self.next_token)
 
@@ -265,6 +275,9 @@ class Robot:
         Draws on the world
         '''
         self.draw_robot(world)
+        # self.draw_angle_to_next_token(world)
+        # self.draw_next_token(world)
+        # self.debug_theta(world)
         # self.draw_tank_percentage(world)
         # self.draw_error_to_goal(world)
         # self.draw_next_token(world)
@@ -292,7 +305,7 @@ class Robot:
             dist_to_wall = np.hypot(v2_x, v2_y)
             if dist_to_wall <= self.sensor_range:
                 # Calculate the angle between robot direction and obstacle
-                relative_angle = calc_angle((cos_theta, sin_theta), (v2_x, v2_y))
+                relative_angle = calc_angle((cos_theta, sin_theta), (v2_x, v2_y), cache=True)
                 # Check which sensor should be activated
                 for i, (sensor_start, sensor_end) in enumerate(self.sensor_ranges):
                     if sensor_start <= relative_angle < sensor_end:
@@ -308,14 +321,15 @@ class Robot:
 
         collided_walls = self.hitbox.collidelist(nearby_obstacles)
         if collided_walls != NO_COLLISIONS: # -1 equals no collision:
-            self.collision -= 20
-            self.energy_tank = max(self.energy_tank-MAX_ENERGY*0.005, 0)
+            self.collision -= 5
+
             self.sensor[0] = 1
             self.collided = True
+            self.energy_tank = max(self.energy_tank-MAX_ENERGY*0.01, 0)
             return nearby_obstacles[collided_walls]
         else:
-            # self.energy_tank = max(self.energy_tank-MAX_ENERGY*0.001, 0)
-            self.collision += 0
+            if not self.tank_empty:
+                self.collision += 1
             self.collided = False
             return 0
         
@@ -335,11 +349,17 @@ class Robot:
             self.shortest_route = round(calc_distance((self.x ,self.y), (self.next_token.x,self.next_token.y)))
             self.need_next_token = False
 
-        self.delta_x = round(self.next_token.x - self.x) 
-        self.delta_y = round(self.next_token.y - self.y) 
-        self.error_to_goal = 1 - bound(np.hypot(self.delta_x,self.delta_y) / self.shortest_route,0,4)
-        self.closeness.append(self.error_to_goal)
-
+        
+        if not self.tank_empty:
+            self.delta_x = self.next_token.x - self.x
+            self.delta_y = self.next_token.y - self.y 
+            r = np.hypot(self.delta_x,self.delta_y)
+            rounded_theta = bin_angle(self.theta,0.1)
+            cos_theta = math.cos(rounded_theta)
+            sin_theta = math.sin(rounded_theta)
+            self.angle_w_next_token = calc_angle((cos_theta, sin_theta), (self.delta_x , self.delta_y ), cache=True)
+            self.error_to_goal = 1 - bound(r / self.shortest_route,0,2)
+            self.closeness.append(self.error_to_goal)
 
         if self.next_token not in self.tokens_locations:
             self.need_next_token = True
@@ -352,7 +372,10 @@ class Robot:
 
         self.get_reference_position()
         theta = round(self.theta/math.pi,2)
-        self.state = np.array([self.delta_x,self.delta_y,theta,*self.sensor[1:]]).reshape(-1,1)
+        # x = 1 - bound(abs(self.delta_x)/self.shortest_route,0,2)
+        # y = 1 - bound(abs(self.delta_y)/self.shortest_route,0,2)
+        energy = self.energy_tank / MAX_ENERGY
+        self.state = np.array([self.error_to_goal,self.angle_w_next_token,theta,energy,*self.sensor[1:]]).reshape(-1,1)
         return
         
     def get_tokens(self, t):
@@ -370,7 +393,8 @@ class Robot:
             return self.next_token
         if self.next_token == self.tokens_locations[token_collected]:
             self.token += 1
-            self.energy_tank = min(self.energy_tank+MAX_ENERGY*0.1, MAX_ENERGY)
+            self.energy_tank = min(self.energy_tank+MAX_ENERGY*0.3, MAX_ENERGY)
+
             self.time_stamps.append(t)
             self.tokens_locations.pop(token_collected)
         return self.next_token
@@ -476,7 +500,7 @@ class Robot:
             + W_QUICK*sum(quicknes)
             # + len(self.visited_cells)*0.3
             + closeness*W_CLOSE
-            + self.collision*W_COL
+            # + self.collision*W_COL
             + 1000*self.reached_end
             + (self.time_tank_empty)
             # - sum(self.ls_pos_error)*0.1

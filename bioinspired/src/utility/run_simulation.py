@@ -104,8 +104,10 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
                 robot.get_end_tile()
             robot.move(robot.get_collision(nearby_obstacles), dt, auto=True)
             robot.draw(wm.surf)
-   
-        draw_next_token(wm.surf, tokens_collected[-1])
+        if token_to_collect:
+            draw_next_token(wm.surf, tokens_collected[-1])
+        else:
+            draw_next_token(wm.surf,wm.end_pos)
         draw_time(wm.surf, (pygame.time.get_ticks()/1000))
         draw_gen(wm.surf,gen)
         lasttime = pygame.time.get_ticks()
