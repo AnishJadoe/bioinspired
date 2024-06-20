@@ -79,8 +79,9 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
     dt = 0
     tokens_collected = []
     all_tanks_empty = False
+    robots_finished = set()
     # Simulation loop
-    while not all_tanks_empty and running:
+    while (not all_tanks_empty and running):
         clock.tick(30)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -94,16 +95,20 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
         # Update frame by redrawing everything
         wm.update_map()
         for robot in ls_robots:
-            robot.update_state(timestamp)
-            nearby_obstacles = robot.find_position(wm)
-            robot.update_sensors(nearby_obstacles,wm)
-            token_to_collect = robot.get_tokens(timestamp)
-            if token_to_collect not in tokens_collected:
-                tokens_collected.append(token_to_collect)
-            if robot.found_all_tokens:
-                robot.get_end_tile()
+            if not robot.reached_end:
+                robot.update_state(timestamp)
+                nearby_obstacles = robot.find_position(wm)
+                robot.update_sensors(nearby_obstacles,wm)
+                token_to_collect = robot.get_tokens(timestamp)
+                if token_to_collect not in tokens_collected:
+                    tokens_collected.append(token_to_collect)
+            elif robot.reached_end:
+                robots_finished.add(robot.id)
+                running = False
+
             robot.move(robot.get_collision(nearby_obstacles), dt, auto=True)
             robot.draw(wm.surf)
+
         if token_to_collect:
             draw_next_token(wm.surf, tokens_collected[-1])
         else:
@@ -114,7 +119,8 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
         pygame.display.update()
 
     pygame.quit()
-
+    for id in robots_finished:
+        print(f"Robot {id} finished the course")
     for robot in ls_robots:
         fitness.append(robot.get_reward())
         tot_cells_explored.append(robot.avg_dist)
@@ -146,6 +152,8 @@ def single_agent_run(wm: WorldMap, time, chromosome):
     dt = 0
     # Simulation loop
     while pygame.time.get_ticks() <= (time+loadtime) and running:
+        if robot.reached_end:
+            running = False
         clock.tick(30)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -160,6 +168,7 @@ def single_agent_run(wm: WorldMap, time, chromosome):
         token_to_collect = robot.get_tokens(0)
         robot.move(robot.get_collision(nearby_obstacles), dt, auto=True)
         robot.draw(wm.surf)
+        
         draw_next_token(wm.surf, token_to_collect)
 
 

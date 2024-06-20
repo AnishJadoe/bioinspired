@@ -63,7 +63,7 @@ class Robot:
 
         self.energy_tank = MAX_ENERGY
         self.tank_empty = False
-        self.time_tank_empty = 0
+        self.time_active = 0
 
         self.found_all_tokens = False
         self.reached_end = False
@@ -111,7 +111,7 @@ class Robot:
         omega = round(self.omega/(2*math.pi))
         energy = self.energy_tank / MAX_ENERGY
         self.angle_w_next_token = 0
-        self.state = np.array([self.error_to_goal,self.angle_w_next_token,theta,energy,*self.sensor[1:]]).reshape(-1,1)
+        self.state = np.array([self.vl,self.vr,self.error_to_goal,self.angle_w_next_token,theta,energy,*self.sensor[1:]]).reshape(-1,1)
 
         self.width = width 
         self.length = width 
@@ -339,16 +339,14 @@ class Robot:
         
     def get_reference_position(self):
             
-        if self.need_next_token and not self.found_all_tokens:
-            closest_cell_index = find_closest_cell((self.x // CELL_SIZE, self.y // CELL_SIZE), self.tokens_locations)
-            self.next_token = self.tokens_locations[closest_cell_index]
+        if self.need_next_token:
+            if not self.found_all_tokens:
+                closest_cell_index = find_closest_cell((self.x // CELL_SIZE, self.y // CELL_SIZE), self.tokens_locations)
+                self.next_token = self.tokens_locations[closest_cell_index]
+            else:
+                self.next_token = self.endpos
             self.shortest_route = round(calc_distance((self.x ,self.y), (self.next_token.x,self.next_token.y)))
             self.need_next_token = False
-        if self.found_all_tokens:
-            self.next_token = self.endpos
-            self.shortest_route = round(calc_distance((self.x ,self.y), (self.next_token.x,self.next_token.y)))
-            self.need_next_token = False
-
         
         if not self.tank_empty:
             self.delta_x = self.next_token.x - self.x
@@ -357,7 +355,7 @@ class Robot:
             rounded_theta = bin_angle(self.theta,0.1)
             cos_theta = math.cos(rounded_theta)
             sin_theta = math.sin(rounded_theta)
-            self.angle_w_next_token = calc_angle((cos_theta, sin_theta), (self.delta_x , self.delta_y ), cache=True)
+            self.angle_w_next_token = calc_angle((cos_theta, sin_theta), (self.delta_x , self.delta_y )) / (math.pi)
             self.error_to_goal = 1 - bound(r / self.shortest_route,0,2)
             self.closeness.append(self.error_to_goal)
 
@@ -366,16 +364,16 @@ class Robot:
         
         
     def update_state(self, t=None):
+        if not self.reached_end and not self.tank_empty:
+            self.time_active = t
         if self.energy_tank <= 0.0 and not self.tank_empty:
-            self.time_tank_empty = t
             self.tank_empty = True
-
         self.get_reference_position()
-        theta = round(self.theta/math.pi,2)
-        # x = 1 - bound(abs(self.delta_x)/self.shortest_route,0,2)
-        # y = 1 - bound(abs(self.delta_y)/self.shortest_route,0,2)
-        energy = self.energy_tank / MAX_ENERGY
-        self.state = np.array([self.error_to_goal,self.angle_w_next_token,theta,energy,*self.sensor[1:]]).reshape(-1,1)
+        omega = round(self.omega/(2*math.pi),2)
+        energy = 1 - (self.energy_tank / MAX_ENERGY)
+        vr = self.vr/self.maxspeed
+        vl = self.vl/self.maxspeed
+        self.state = np.array([vl,vr,self.error_to_goal,self.angle_w_next_token,omega,energy,*self.sensor[1:]]).reshape(-1,1)
         return
         
     def get_tokens(self, t):
@@ -386,15 +384,14 @@ class Robot:
         if len(self.tokens_locations) == 0:
             # Found all Tokens
             self.found_all_tokens = True
-            print("FOUND ALL TOKENS")
-            return
+            self.get_end_tile()
+            return self.endpos
         token_collected = self.hitbox.collidelist(self.tokens_locations) 
         if token_collected == -1:
             return self.next_token
         if self.next_token == self.tokens_locations[token_collected]:
             self.token += 1
             self.energy_tank = min(self.energy_tank+MAX_ENERGY*0.3, MAX_ENERGY)
-
             self.time_stamps.append(t)
             self.tokens_locations.pop(token_collected)
         return self.next_token
@@ -404,12 +401,11 @@ class Robot:
         if found_end_tile == -1:
             return
         else:
-            print("Found the final tile!!")
             self.reached_end = True 
 
 
     def move(self, wall_collided, dt, event=None, auto=False):
-        if self.tank_empty or self.found_all_tokens:
+        if self.tank_empty or self.reached_end:
             return
         
         self.ls_x.append(self.x)
@@ -496,20 +492,14 @@ class Robot:
 
         fitness = round(
             W_TOKEN*self.token 
-            # + 5*sum(getting_closer)
-            + W_QUICK*sum(quicknes)
-            # + len(self.visited_cells)*0.3
+            + W_QUICK*(self.token/self.time_active)
             + closeness*W_CLOSE
-            # + self.collision*W_COL
+            + self.collision*W_COL
             + 1000*self.reached_end
-            + (self.time_tank_empty)
-            # - sum(self.ls_pos_error)*0.1
-            # - self.same_cell*0.05
-            # - 3*(self.dist_travelled/self.m2p) 
             ,2)
         print(f"-------{self.id}--------")
-        print(f"T: {self.token*W_TOKEN}, Q: {sum(quicknes*W_QUICK)}, \
-              Clo: {closeness*W_CLOSE}, Col: {self.collision*W_COL}, Time: {(self.time_tank_empty)}")
+        print(f"T: {self.token*W_TOKEN}, Q: {W_QUICK*(self.token/self.time_active)}, \
+              Clo: {closeness*W_CLOSE}, Col: {self.collision*W_COL}, Time: {(self.time_active)}")
         print(f"Fitness: {fitness}")
         return fitness
     

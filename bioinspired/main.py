@@ -7,12 +7,12 @@ import numpy as np
 from src.runners.genetic_algorithm import GeneticAlgorithmRunner
 from src.utility.constants import *
 # seeds = [30,42,50,70,80,100]
-seeds = [42]
-epochs = 25
+seeds = [30,42,50]
+epochs = 20
 time = 30 * 1000 # milliseconds
-n_robots = 50
+n_robots = 70
 ls_cross_rate = [1]
-ls_mut_rate = [0.8]
+ls_mut_rate = [0.9,0.85,0.8]
 
 for seed in seeds:
     np.random.seed(seed)
