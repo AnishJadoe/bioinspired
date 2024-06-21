@@ -1,10 +1,11 @@
-from ..world_map.txt_to_map import WorldMap
-from ..robot.robot import Robot
+from src.robots.robots import BaseManualRobot, BaseRobot
+from src.utility.functions import find_nearby_obstacles
+from src.world_map.draw_functions import draw_end_pos, draw_motor_speed, draw_next_token, draw_robot, draw_time
+from ..world_map.world_map import WorldMap
+from ..robots.robot import Robot
 import pygame
 
 import cProfile
-import pstats
-import io
 from ..utility.constants import *
 
 
@@ -20,18 +21,6 @@ def profile_update_sensors_to_file(robot, nearby_obstacles, world_map):
     return robot
 
 BLUE = (0,0,255)
-def draw_time(world, time):
-    font = pygame.font.SysFont(None, 36)
-    txt = font.render(f'Time: {round(time,1)}', True, BLUE)
-    world.blit(txt,(750,50))
-
-def draw_gen(world, gen):
-    font = pygame.font.SysFont(None, 24)
-    txt = font.render(f'Gen: {gen}', True, BLUE)
-    world.blit(txt,(800,75))
-
-def draw_next_token(world, token):
-    pygame.draw.rect(world,BLUE, token)
 
 # MAIN GAME LOOP
 def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
@@ -225,7 +214,7 @@ def multi_agent_run(wm: WorldMap, time, chromosomes):
 
     pygame.quit()
 
-def manual_mode(wm: WorldMap):
+def manual_mode(wm: WorldMap, robot:BaseManualRobot, drawfunc):
     clock = pygame.time.Clock()
     
     pygame.init()
@@ -235,24 +224,28 @@ def manual_mode(wm: WorldMap):
     lasttime = pygame.time.get_ticks()
     loadtime = lasttime
     running = True
-    robot = Robot((wm.start_pos.x, wm.start_pos.y), width=30, 
-                  chromosome=[], token_locations=wm.tokens, special_flag=True)
+    robot = robot(startpos=(wm.start_pos.x, wm.start_pos.y),targets=wm.tokens, end_target=wm.end_pos)
     # Simulation loop
     while running:
-
+        if robot.mission_complete:
+            print(f"Congrats you won within {(pygame.time.get_ticks()- loadtime)/1000} seconds")
+            running=False
+        clock.tick(30)
         wm.update_map()
-        nearby_obstacles = robot.find_position(wm)
-        robot.update_sensors(nearby_obstacles,wm)
-        # robot.get_tokens()
+        
+        nearby_obstacles = find_nearby_obstacles(robot,wm)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            robot.move(robot.get_collision(nearby_obstacles),dt,event)
-        robot.move(robot.get_collision(nearby_obstacles), dt)
-        dt = 0.01 #(pygame.time.get_ticks() - lasttime) / 1000
-        robot.draw(wm.surf)
+            robot.handler(nearby_obstacles=nearby_obstacles,dt=dt,event=event)  
+        robot.handler(nearby_obstacles=nearby_obstacles, dt=dt)
+        dt = (pygame.time.get_ticks() - lasttime) / 1000
+        
+        draw_robot(robot,wm.surf)
+        draw_time(wm.surf, (pygame.time.get_ticks()- loadtime)/1000)
+        drawfunc(robot,wm)
 
-        draw_time(wm.surf, (pygame.time.get_ticks()- loadtime))
+        
         lasttime = pygame.time.get_ticks()
         pygame.display.update()
 

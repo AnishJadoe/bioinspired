@@ -1,5 +1,5 @@
 import os
-from ..world_map.txt_to_map import WorldMap
+from ..world_map.world_map import WorldMap
 from ..utility.functions import cache_size_kb, get_init_chromosomes_NN
 from ..utility.run_simulation import run_simulation
 from ..utility.constants import *

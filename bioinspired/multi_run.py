@@ -1,5 +1,5 @@
 import pickle
-from src.world_map.txt_to_map import WorldMap
+from bioinspired.src.world_map.world_map import WorldMap
 from src.utility.run_simulation import multi_agent_run
 from src.utility.functions import load_GAs
 

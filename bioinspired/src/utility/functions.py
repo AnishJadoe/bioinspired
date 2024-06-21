@@ -3,7 +3,9 @@ import numpy as np
 import math
 import pickle
 import os
-import functools
+
+from src.world_map.world_map import WorldMap
+from ..utility.constants import *
 
 ################ FUNCTIONS ################
 
@@ -143,3 +145,66 @@ def cache_size_kb():
     size_bytes = get_size(angle_cache)
     size_kb = size_bytes / 1024
     return size_kb
+
+def bound(value, low, high):
+    return max(low, min(high, value))
+
+def bin_angle(angle, bin_width=0.1):
+        """Bins the angle to the nearest bin width."""
+        return round(angle / bin_width) * bin_width
+
+def find_closest_cell(agent_location, cells):
+    # Extract the coordinates of the agent's location
+    agent_x, agent_y = agent_location
+    
+    # Initialize variables to keep track of the closest cell index and its distance
+    closest_index = None
+    min_distance = float('inf')
+    
+    # Iterate through movable cells to find the closest one
+    for index, cell in enumerate(cells):
+        # Extract the coordinates of the movable cell
+        cell_x , cell_y, _, _ = cell
+        
+        # Calculate the Euclidean distance between the agent and the cell
+        distance = math.sqrt((agent_x - cell_x // CELL_SIZE)**2 + (agent_y - cell_y // CELL_SIZE)**2)
+        
+        # Update the closest cell index and distance if necessary
+        if distance < min_distance:
+            min_distance = distance
+            closest_index = index
+    
+    return closest_index
+
+def find_nearby_obstacles(robot,world_map:WorldMap):
+    nearby_obstacles = []
+    cell_x = int(robot.x // world_map.tile_size)
+    cell_y = int(robot.y // world_map.tile_size)
+    min_range_x = max(0, cell_x - 3)
+    max_range_x = min(world_map.map_width, cell_x + 4)
+    min_range_y = max(0, cell_y - 3)
+    max_range_y = min(world_map.map_height, cell_y + 4)
+
+    for i in range(min_range_x, max_range_x):
+        for j in range(min_range_y, max_range_y):
+            if world_map.binary_map[i][j] == 1:
+                nearby_obstacles.extend(world_map.spatial_grid[i][j])
+    return nearby_obstacles
+
+def get_collision(robot, nearby_obstacles):
+    """Function to calculate whetere collisions between the walls and the agent have occured """
+    NO_COLLISIONS = -1
+
+    collided_walls = robot.hitbox.collidelist(nearby_obstacles)
+    if collided_walls != NO_COLLISIONS: # -1 equals no collision:
+        robot.collision -= 5
+
+        robot.sensor[0] = 1
+        robot.collided = True
+        robot.energy_tank = max(robot.energy_tank-MAX_ENERGY*0.01, 0)
+        return nearby_obstacles[collided_walls]
+    else:
+        if not robot.tank_empty:
+            robot.collision += 1
+        robot.collided = False
+        return 0
