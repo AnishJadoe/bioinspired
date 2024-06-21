@@ -1,7 +1,8 @@
 import pygame.locals
 
 from src.controllers.neural_net import NeuralNet
-
+from src.utility.constants import *
+import numpy as np
 MAX_SPEED = 255
 MIN_SPEED = -255
 M2P = 3779.52
@@ -34,22 +35,26 @@ class ManualController(BaseController):
         
         if event.type in {pygame.KEYDOWN, pygame.KEYUP}:
             if event.key == pygame.locals.K_a:
-                vl += 0.01 * M2P
+                vl += 0.005 * M2P
             elif event.key == pygame.locals.K_s:
-                vl -= 0.01 * M2P
+                vl -= 0.005 * M2P
             elif event.key == pygame.locals.K_k:
-                vr += 0.01 * M2P
+                vr += 0.005 * M2P
             elif event.key == pygame.locals.K_j:
-                vr -= 0.01 * M2P
+                vr -= 0.005 * M2P
                 
         return (vl,vr)
 
 class NeuroController(BaseController):
-    def __init__(self):
+    def __init__(self,chromosome,n_inputs=N_INPUTS,n_outputs=N_OUTPUTS, n_hidden=N_HIDDEN):
         super().__init__()
         self.name = "Neuro Controller"
-        self.network = NeuralNet()
+        self.network = NeuralNet(n_inputs=n_inputs,n_outputs=n_outputs,n_hidden=n_hidden,chromosome=chromosome)
     
     def calculate_motor_speed(self, state):
-        return self.network.forward_pass(state)
+        motor_speeds = self.network.forward_pass(state)
+        vl = np.clip(self.scale_action(motor_speeds[0, 0]), MIN_SPEED, MAX_SPEED)
+        vr = np.clip(self.scale_action(motor_speeds[1, 0]), MIN_SPEED, MAX_SPEED)
+        
+        return float(vl), float(vr)
         

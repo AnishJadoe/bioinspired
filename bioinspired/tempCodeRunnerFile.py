@@ -1,1 +1,2 @@
-r"saved_runs/n_robots_200/epochs_30"
+    draw_sensor_orientation(robot,wm.surf)
+    draw_sensor_activation(robot,wm.surf)

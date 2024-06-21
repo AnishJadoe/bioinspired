@@ -9,39 +9,39 @@ from ..utility.constants import *
 
 def draw_tank_percentage(robot, world):
     font = pygame.font.SysFont(None, 24)
-    img = font.render(f'Tank: {round((robot.energy_tank/MAX_ENERGY) * 100),1}%', True, (0,0,0))
+    img = font.render(f'Tank: {round((robot.energy_in_tank/MAX_ENERGY) * 100),1}%', True, (0,0,0))
     world.blit(img,(robot.x,robot.y))
 
 def draw_sensor_orientation(robot,world):
     for i,sensor in enumerate(robot.sensor[1:]):
         sensor_angle = robot.sensor_spacing[i]
         pygame.draw.line(world, SENSOR_COLORS[i], (robot.x, robot.y), 
-        (robot.x+math.cos(robot.theta+math.radians(sensor_angle))*robot.sensor_range,
-        robot.y+math.sin(robot.theta+math.radians(sensor_angle))*robot.sensor_range),width=2)
+        (robot.x+math.cos(robot.theta+sensor_angle)*robot.sensor_range,
+        robot.y+math.sin(robot.theta+sensor_angle)*robot.sensor_range),width=2)
 
         pygame.draw.line(world, SENSOR_COLORS[i], (robot.x, robot.y), 
-        (robot.x+math.cos(robot.theta+math.radians(sensor_angle + robot.sensor_sweep))*robot.sensor_range,
-        robot.y+math.sin(robot.theta+math.radians(sensor_angle + robot.sensor_sweep))*robot.sensor_range),width=2)
+        (robot.x+math.cos(robot.theta+sensor_angle + robot.sensor_sweep)*robot.sensor_range,
+        robot.y+math.sin(robot.theta+sensor_angle + robot.sensor_sweep)*robot.sensor_range),width=2)
 
         pygame.draw.line(world, SENSOR_COLORS[i], (robot.x, robot.y), 
-        (robot.x+math.cos(robot.theta+math.radians(sensor_angle - robot.sensor_sweep))*robot.sensor_range,
-        robot.y+math.sin(robot.theta+math.radians(sensor_angle - robot.sensor_sweep))*robot.sensor_range),width=2)
+        (robot.x+math.cos(robot.theta+sensor_angle - robot.sensor_sweep)*robot.sensor_range,
+        robot.y+math.sin(robot.theta+sensor_angle - robot.sensor_sweep)*robot.sensor_range),width=2)
 
 def draw_sensor_activation(robot,world):
     for i,sensor in enumerate(robot.sensor[1:]):
         if sensor:
             sensor_angle = robot.sensor_spacing[i]
             pygame.draw.line(world, SENSOR_COLORS[i], (robot.x, robot.y), 
-            (robot.x+math.cos(robot.theta+math.radians(sensor_angle))*robot.sensor_range,
-            robot.y+math.sin(robot.theta+math.radians(sensor_angle))*robot.sensor_range),width=6)
+            (robot.x+math.cos(robot.theta+sensor_angle)*robot.sensor_range,
+            robot.y+math.sin(robot.theta+sensor_angle)*robot.sensor_range),width=6)
 
             pygame.draw.line(world, SENSOR_COLORS[i], (robot.x, robot.y), 
-            (robot.x+math.cos(robot.theta+math.radians(sensor_angle + robot.sensor_sweep))*robot.sensor_range,
-            robot.y+math.sin(robot.theta+math.radians(sensor_angle + robot.sensor_sweep))*robot.sensor_range),width=6)
+            (robot.x+math.cos(robot.theta+sensor_angle + robot.sensor_sweep)*robot.sensor_range,
+            robot.y+math.sin(robot.theta+sensor_angle + robot.sensor_sweep)*robot.sensor_range),width=6)
 
             pygame.draw.line(world, SENSOR_COLORS[i], (robot.x, robot.y), 
-            (robot.x+math.cos(robot.theta+math.radians(sensor_angle - robot.sensor_sweep))*robot.sensor_range,
-            robot.y+math.sin(robot.theta+math.radians(sensor_angle - robot.sensor_sweep))*robot.sensor_range),width=6)
+            (robot.x+math.cos(robot.theta+sensor_angle - robot.sensor_sweep)*robot.sensor_range,
+            robot.y+math.sin(robot.theta+sensor_angle - robot.sensor_sweep)*robot.sensor_range),width=6)
 
 def draw_motor_speed(robot,world):
     font = pygame.font.SysFont(None, 20)
@@ -52,9 +52,8 @@ def draw_motor_speed(robot,world):
 
 def debug_theta(robot,world):
     font = pygame.font.SysFont(None, 24)
-    # img = font.render(f'theta: {round(math.degrees(robot.theta),1)}', True, (0,0,0))
-    # world.blit(img,(robot.x,robot.y))
-
+    img = font.render(f'theta: {round(math.degrees(robot.theta),1)}', True, (0,0,0))
+    world.blit(img,(robot.x,robot.y))
     pygame.draw.line(world, RED, (robot.x, robot.y), 
     (robot.x+math.cos(robot.theta)*robot.sensor_range,
     robot.y+math.sin(robot.theta)*robot.sensor_range),width=2)

@@ -1,4 +1,7 @@
 import os
+from typing import List
+
+from src.robots.robots import BaseRobot
 from ..world_map.world_map import WorldMap
 from ..utility.functions import cache_size_kb, get_init_chromosomes_NN
 from ..utility.run_simulation import run_simulation
@@ -15,7 +18,7 @@ class GeneticAlgorithmRunner:
     parameters can be changed as needed
     """
 
-    def __init__(self, n_robots, epochs, run_time, cross_rate, mut_rate, seed):
+    def __init__(self,world, n_robots, epochs, run_time, cross_rate, mut_rate,robot_type, seed):
         """Initialization of the class
 
         Args:
@@ -33,6 +36,8 @@ class GeneticAlgorithmRunner:
         self.gen = 1
         self.run_time = run_time
         self.seed = seed
+        self.robot_type = robot_type
+        self.world = world
         
         self.best_fitness = list()
         self.best_individuals = list()
@@ -99,7 +104,6 @@ class GeneticAlgorithmRunner:
           
 
         return ls_p + ls_p
-
 
 
     def mutation(self, individual):
@@ -242,13 +246,13 @@ class GeneticAlgorithmRunner:
             print(f"GENERATION: {self.gen}")
             self._save_population()
             # Build world
-            wm = WorldMap(skeleton_file="bioinspired/src/world_map/maps/follow_token_map.txt", 
+            wm = WorldMap(skeleton_file=self.world, 
                           map_width=MAP_DIMS[0], map_height=MAP_DIMS[1], tile_size=CELL_SIZE)
-            population_results = run_simulation(
-                wm, self.run_time, self.pop, self.n_robots, self.gen
+            individual_results = run_simulation(
+                wm, self.run_time,self.robot_type, self.pop, self.n_robots, self.gen
             )
-    
-            self._save_results(population_results)
+            population_results = self._save_population_results(individual_results)
+            self._save_generation(population_results)
             self.fitness = population_results["pop_fitness"]
             for i in range(self.n_robots):
                 if self.fitness[i] > self.best_eval:
@@ -263,7 +267,6 @@ class GeneticAlgorithmRunner:
             best_individuals = self.get_best_individuals()
             children.extend(best_individuals)
             parents = self.tournament_selection()
-
             mating = True
             while mating:
                 parent1_index = np.random.randint(0, len(parents))
@@ -281,31 +284,48 @@ class GeneticAlgorithmRunner:
             self.pop = children[:self.n_robots+1]
             self.gen += 1
             print(f"Size of cache is {cache_size_kb()/1000} MB")
-            if self.gen % 50 == 0 and epoch != (self.epochs-1): # Save every 10 generations
-                self.save_run()
-
-        self.save_run()
-
+        self._save_run()
         return
 
     def _save_population(self):
         self.all_populations[self.gen] = self.pop
 
-    def _save_results(self, population_results):
+    def _save_population_results(self, individual_results:List[BaseRobot]):
+    
+        population_results = {}
+        pop_fitness = list()
+        pop_attitudes = list()
+        pop_rates = list()
+        pop_tokens = list()
+        pop_collisions = list() 
+        
+        for results in individual_results:
+            pop_fitness.append(results.get_reward())
+            pop_attitudes.append(results.log_attitude)
+            pop_rates.append(results.log_rates)
+            pop_tokens.append(results.targets_collected)
+            pop_collisions.append(results.collided_w_wall)
+            
+        population_results["pop_fitness"] = pop_fitness
+        population_results["pop_attitudes"] = pop_attitudes
+        population_results["pop_rates"] = pop_rates
+        population_results["pop_tokens"] = pop_tokens
+        population_results["pop_collisions"] = pop_collisions
+        return population_results
+    
+    def _save_generation(self,population_results):
         results_this_gen = {}
-
         results_this_gen["fitness"] = population_results["pop_fitness"]
-        results_this_gen["abs_dist"] = population_results["pop_abs_distance"]
-        results_this_gen["rel_dist"] = population_results["pop_rel_distance"]
         results_this_gen["collisions"] = population_results["pop_collisions"]
-        results_this_gen["tokens"] = population_results["pop_token"]
-        results_this_gen["cells_explored"] = population_results["pop_cells_explored"]
+        results_this_gen["tokens"] = population_results["pop_tokens"]
+        results_this_gen["attitudes"] = population_results["pop_attitudes"]
+        results_this_gen["rates"] = population_results["pop_rates"]
         results_this_gen["best_eval"] = self.best_eval
         results_this_gen["best_agent"] = self.best_agent
 
         self.results[self.gen] = results_this_gen
 
-    def save_run(self):
+    def _save_run(self):
         self.world_map = []  # Can't save pygame surface
         folder = f"saved_runs/n_robots_{self.n_robots}/epochs_{self.gen-1}/epoch_time_{self.run_time}/seed_{self.seed}/neurons_{N_HIDDEN}"
         run_name = f"{self.mut_rate}mut_{self.cross_rate}cross.pkl"

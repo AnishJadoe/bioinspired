@@ -1,6 +1,7 @@
-from src.robots.robots import BaseManualRobot, BaseRobot
+from typing import List
+from src.robots.robots import BaseManualRobot, BaseRobot, TankNeuroRobot
 from src.utility.functions import find_nearby_obstacles
-from src.world_map.draw_functions import draw_end_pos, draw_motor_speed, draw_next_token, draw_robot, draw_time
+from src.world_map.draw_functions import draw_end_pos, draw_gen, draw_motor_speed, draw_next_token, draw_robot, draw_sensor_activation, draw_sensor_orientation, draw_tank_percentage, draw_time
 from ..world_map.world_map import WorldMap
 from ..robots.robot import Robot
 import pygame
@@ -23,7 +24,7 @@ def profile_update_sensors_to_file(robot, nearby_obstacles, world_map):
 BLUE = (0,0,255)
 
 # MAIN GAME LOOP
-def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
+def run_simulation(wm: WorldMap, time,robot_type,  pop, n_robots, gen):
     """This is the main game loop of the algorithm, it is called by the Genetic Algorithm class in
     the main loop. It yields the scores of the corresponding individual chromosomes and saves the result of each run to the genetic algorithm class
 
@@ -37,15 +38,8 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
         scores (float)]: The scores given to each individual
     """
     clock = pygame.time.Clock()
-    ls_robots = list()
-    
-    simulation_results = {}
-    fitness = list()
-    tot_abs_dist = list()
-    tot_rel_dist = list()
-    tot_coll = list()
-    tot_token = list()
-    tot_cells_explored = list()
+    robots = list()
+
     wm.build_map()
     # print(f"Walls in map: {len(wm.walls)}")
     pygame.init()
@@ -56,9 +50,9 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
         else:
             special = False
             
-        ls_robots.append(
-            Robot(robot_id=i, startpos=(wm.start_pos.x, wm.start_pos.y), endpos=wm.end_pos, width=20, 
-                  chromosome=pop[i], token_locations=wm.tokens.copy(), special_flag=special)
+        robots.append(
+            robot_type(robot_id=i, startpos=(wm.start_pos.x, wm.start_pos.y),targets=wm.tokens.copy(), end_target=wm.end_pos, 
+                  chromosome=pop[i], special=special)
         )
 
     lasttime = pygame.time.get_ticks()
@@ -68,7 +62,6 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
     dt = 0
     tokens_collected = []
     all_tanks_empty = False
-    robots_finished = set()
     # Simulation loop
     while (not all_tanks_empty and running):
         clock.tick(30)
@@ -77,55 +70,35 @@ def run_simulation(wm: WorldMap, time, pop, n_robots, gen):
                 running = False
         timestamp = (pygame.time.get_ticks()/1000)
         dt = (pygame.time.get_ticks() - lasttime) / 1000
-        tanks_empty = [robot.tank_empty for robot in ls_robots]
+        tanks_empty = [robot.tank_empty for robot in robots]
         if all(tanks_empty):
             all_tanks_empty = True
             continue
-        # Update frame by redrawing everything
         wm.update_map()
-        for robot in ls_robots:
-            if not robot.reached_end:
-                robot.update_state(timestamp)
-                nearby_obstacles = robot.find_position(wm)
-                robot.update_sensors(nearby_obstacles,wm)
-                token_to_collect = robot.get_tokens(timestamp)
+        for robot in robots:
+            if not robot.mission_complete:
+                nearby_obstacles = find_nearby_obstacles(robot,wm)
+                robot.handler(nearby_obstacles=nearby_obstacles, dt=dt, time=timestamp)
+                token_to_collect = robot.current_target
                 if token_to_collect not in tokens_collected:
                     tokens_collected.append(token_to_collect)
-            elif robot.reached_end:
-                robots_finished.add(robot.id)
+            elif robot.mission_complete:
+                print(f"Robot {robot.id} finished")
                 running = False
-
-            robot.move(robot.get_collision(nearby_obstacles), dt, auto=True)
-            robot.draw(wm.surf)
-
+            draw_robot(robot,wm.surf)
         if token_to_collect:
-            draw_next_token(wm.surf, tokens_collected[-1])
+            draw_next_token(tokens_collected[-1], wm.surf)
         else:
-            draw_next_token(wm.surf,wm.end_pos)
+            draw_end_pos(wm.end_pos,wm.surf)
+            
         draw_time(wm.surf, (pygame.time.get_ticks()/1000))
         draw_gen(wm.surf,gen)
         lasttime = pygame.time.get_ticks()
         pygame.display.update()
 
     pygame.quit()
-    for id in robots_finished:
-        print(f"Robot {id} finished the course")
-    for robot in ls_robots:
-        fitness.append(robot.get_reward())
-        tot_cells_explored.append(robot.avg_dist)
-        tot_abs_dist.append(robot.dist_travelled)
-        tot_coll.append(robot.collision)
-        tot_token.append(robot.token)
-        tot_cells_explored.append(len(robot.visited_cells))
 
-    simulation_results["pop_fitness"] = fitness
-    simulation_results["pop_rel_distance"] = tot_rel_dist
-    simulation_results["pop_abs_distance"] = tot_abs_dist
-    simulation_results["pop_collisions"] = tot_coll
-    simulation_results["pop_token"] = tot_token
-    simulation_results["pop_cells_explored"] = tot_cells_explored
-
-    return simulation_results
+    return robots
 
 def single_agent_run(wm: WorldMap, time, chromosome):
     clock = pygame.time.Clock()
@@ -214,7 +187,7 @@ def multi_agent_run(wm: WorldMap, time, chromosomes):
 
     pygame.quit()
 
-def manual_mode(wm: WorldMap, robot:BaseManualRobot, drawfunc):
+def manual_mode(wm: WorldMap, robot:BaseRobot, drawfunc):
     clock = pygame.time.Clock()
     
     pygame.init()
