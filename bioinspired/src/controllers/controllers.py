@@ -3,8 +3,8 @@ import pygame.locals
 from src.controllers.neural_net import NeuralNet
 from src.utility.constants import *
 import numpy as np
-MAX_SPEED = 255
-MIN_SPEED = -255
+MAX_SPEED = 128
+MIN_SPEED = -128
 M2P = 3779.52
 
 class BaseController():

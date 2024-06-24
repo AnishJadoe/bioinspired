@@ -8,7 +8,7 @@ from ..utility.constants import *
 from ..controllers.controllers import ManualController, NeuroController
 
 ROBOT_WIDTH = 15
-MAX_SPEED = 255
+MAX_SPEED = 128
 
 token_map_cache = {}
 nearby_items_cache = {}

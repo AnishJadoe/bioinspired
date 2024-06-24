@@ -58,7 +58,7 @@ def run_simulation(wm: WorldMap, time,robot_type,  pop, n_robots, gen):
     loadtime = lasttime
     print(f"Loading took: {loadtime/1000} seconds")
     running = True
-    dt = 0
+    dt = 0.01
     tokens_collected = []
     all_tanks_empty = False
     # Simulation loop
@@ -68,7 +68,7 @@ def run_simulation(wm: WorldMap, time,robot_type,  pop, n_robots, gen):
             if event.type == pygame.QUIT:
                 running = False
         timestamp = (pygame.time.get_ticks()/1000)
-        dt = (pygame.time.get_ticks() - lasttime) / 1000
+        #dt = (pygame.time.get_ticks() - lasttime) / 1000
         tanks_empty = [robot.tank_empty for robot in robots]
         if all(tanks_empty):
             all_tanks_empty = True
@@ -92,7 +92,7 @@ def run_simulation(wm: WorldMap, time,robot_type,  pop, n_robots, gen):
         #     draw_end_pos(wm.end_pos,wm.surf)
             
             
-        draw_time(wm.surf, (pygame.time.get_ticks()/1000))
+        draw_time(wm.surf, ((pygame.time.get_ticks() - loadtime)/1000))
         draw_gen(wm.surf,gen)
         lasttime = pygame.time.get_ticks()
         pygame.display.update()
