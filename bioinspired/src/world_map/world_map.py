@@ -4,40 +4,66 @@ from ..utility.constants import *
 
 
 class WorldMap:
-    def __init__(self, skeleton_file, map_width, 
-                 map_height, tile_size):
-        self.skeleton_file = skeleton_file
-        self.map_width = map_width
-        self.map_height = map_height
-        self.tile_size = tile_size
-        self.surf = []  # World map surface to draw on
-        self.binary_map = np.zeros((self.map_width,
-                                    self.map_height))
+    def __init__(self, skeleton_file):
         
+        self.skeleton_file = skeleton_file
+        self.map_width, self.map_height = self._get_map_dims()
+        self.tile_size = CELL_SIZE
+        self.surf = []  # World map surface to draw on
+        self.wall_map = np.zeros((self.map_width,
+                            self.map_height))
+        self.token_map = np.zeros((self.map_width,
+                            self.map_height))
+        self.end_pos = None
         # Save for future reference 
         self.walls = []
         self.tokens = []
         self.start_pos = (0,0)
         self.movable_tiles = []
         self.spatial_grid = [[[] for _ in range(self.map_height)] for _ in range(self.map_width)]
+    
+    def _get_map_dims(self):
+        height = 0
+        width = 0
+        skeleton_file = self._load_skeleton_file(self.skeleton_file)
+        for line in skeleton_file:
+            height += 1
+        width = len(line)
+        return width, height
+    
         
     def build_map(self):
-        skeleton_file = self._load_skeleton_file()
         self.surf = pygame.display.set_mode(size=(
             self.map_width*self.tile_size,
             self.map_height*self.tile_size),
             display=0)
-        self._parse_skeleton_file(skeleton_file)
+        self._parse_skeleton_file()
+
+    def clear_map(self):
+        # Clear all variables
+        self.surf = []  
+        self.wall_map = np.zeros((self.map_width,
+                            self.map_height))
+        self.token_map = np.zeros((self.map_width,
+                    self.map_height))
+        self.walls = []
+        self.tokens = []
+        self.movable_tiles = []
+        self.spatial_grid = [[[] for _ in range(self.map_height)] for _ in range(self.map_width)]
     
     def _add_obstacle(self, obstacle):
         x, y = obstacle.x // self.tile_size, obstacle.y // self.tile_size
         self.spatial_grid[int(x)][int(y)].append(obstacle)
 
-    def _load_skeleton_file(self):
-        return open(self.skeleton_file, "r")
-    
-    def _parse_skeleton_file(self, skeleton_file):
+    def _add_token(self,token):
+        x, y = token.x // self.tile_size, token.y // self.tile_size
+        self.spatial_grid[int(x)][int(y)].append(token)
         
+    def _load_skeleton_file(self, file):
+        return open(file, "r")
+    
+    def _parse_skeleton_file(self):
+        skeleton_file = self._load_skeleton_file(self.skeleton_file)
         for y, line in enumerate(skeleton_file):
             for x, char in enumerate(line):
                 obj = pygame.Rect(
@@ -49,24 +75,22 @@ class WorldMap:
                 if char == "*":
                     self._draw_wall(obj)
                     self.walls.append(obj)
-                    self.binary_map[x][y] = 1
+                    self.wall_map[x][y] = 1
                     self._add_obstacle(obj)
                 if char == "T":
                     self._draw_token(obj)
                     self.tokens.append(obj)
-                    self.binary_map[x][y] = 0
+                    self.token_map[x][y] = 1
+                    self._add_token(obj)
                 if char == "-":
                     self._draw_move_tiles(obj)
                     self.movable_tiles.append(obj)
-                    self.binary_map[x][y] = 0
                 if char == "S":
                     self._draw_start_position(obj)
                     self.start_pos = obj
-                    self.binary_map[x][y] = 0
                 if char == "E":
                     self._draw_end_position(obj)
                     self.end_pos = obj
-                    self.binary_map[x][y] = 0
         return
             
     def _draw_wall(self, obj):
@@ -88,7 +112,8 @@ class WorldMap:
 
         self.surf.fill(WHITE)
         self._draw_start_position(self.start_pos)
-        self._draw_end_position(self.end_pos)
+        if self.end_pos:
+            self._draw_end_position(self.end_pos)
         for wall in self.walls:
             self._draw_wall(wall)
         for token in self.tokens:

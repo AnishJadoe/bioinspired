@@ -246,10 +246,8 @@ class GeneticAlgorithmRunner:
             print(f"GENERATION: {self.gen}")
             self._save_population()
             # Build world
-            wm = WorldMap(skeleton_file=self.world, 
-                          map_width=MAP_DIMS[0], map_height=MAP_DIMS[1], tile_size=CELL_SIZE)
             individual_results = run_simulation(
-                wm, self.run_time,self.robot_type, self.pop, self.n_robots, self.gen
+                self.world, self.run_time,self.robot_type, self.pop, self.n_robots, self.gen
             )
             population_results = self._save_population_results(individual_results)
             self._save_generation(population_results)
@@ -284,6 +282,7 @@ class GeneticAlgorithmRunner:
             self.pop = children[:self.n_robots+1]
             self.gen += 1
             print(f"Size of cache is {cache_size_kb()/1000} MB")
+            self.world.clear_map()
         self._save_run()
         return
 
@@ -298,6 +297,7 @@ class GeneticAlgorithmRunner:
         pop_rates = list()
         pop_tokens = list()
         pop_collisions = list() 
+        pop_time_active = list()
         
         for results in individual_results:
             pop_fitness.append(results.get_reward())
@@ -305,12 +305,14 @@ class GeneticAlgorithmRunner:
             pop_rates.append(results.log_rates)
             pop_tokens.append(results.targets_collected)
             pop_collisions.append(results.collided_w_wall)
+            pop_time_active.append(results.time_active)
             
         population_results["pop_fitness"] = pop_fitness
         population_results["pop_attitudes"] = pop_attitudes
         population_results["pop_rates"] = pop_rates
         population_results["pop_tokens"] = pop_tokens
         population_results["pop_collisions"] = pop_collisions
+        population_results["pop_time_active"] = pop_time_active
         return population_results
     
     def _save_generation(self,population_results):
@@ -320,6 +322,7 @@ class GeneticAlgorithmRunner:
         results_this_gen["tokens"] = population_results["pop_tokens"]
         results_this_gen["attitudes"] = population_results["pop_attitudes"]
         results_this_gen["rates"] = population_results["pop_rates"]
+        results_this_gen["time_active"] = population_results["pop_time_active"]
         results_this_gen["best_eval"] = self.best_eval
         results_this_gen["best_agent"] = self.best_agent
 

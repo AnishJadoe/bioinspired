@@ -6,10 +6,10 @@ from src.utility.run_simulation import manual_mode
 def draw_func(robot:BaseRobot,wm:WorldMap):
     draw_next_token(robot.current_target,wm.surf)
     draw_end_pos(wm.end_pos,wm.surf)
-    # draw_motor_speed(robot,wm.surf)
-    draw_sensor_orientation(robot,wm.surf)
-    draw_sensor_activation(robot,wm.surf)
-    debug_theta(robot,wm.surf)
+    draw_motor_speed(robot,wm.surf)
+    # draw_sensor_orientation(robot,wm.surf)
+    # draw_sensor_activation(robot,wm.surf)
+    # debug_theta(robot,wm.surf)
 
     
 map = r"bioinspired/src/world_map/maps/follow_token_map.txt"

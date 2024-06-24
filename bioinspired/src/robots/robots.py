@@ -2,13 +2,30 @@ import math
 
 import pygame
 import numpy as np
-from src.utility.functions import bin_angle, bound, calc_angle, calc_distance, find_closest_cell
+from src.utility.functions import bin_angle, bound, calc_angle, calc_distance, find_closest_cell, find_nearby_obstacles
 from src.world_map.world_map import WorldMap
 from ..utility.constants import *
 from ..controllers.controllers import ManualController, NeuroController
 
-ROBOT_WIDTH = 20
+ROBOT_WIDTH = 15
 MAX_SPEED = 255
+
+token_map_cache = {}
+nearby_items_cache = {}
+def build_token_map(token_locations):
+    # Convert token locations to a hashable representation (tuple of coordinates)
+    token_key = tuple((token.x, token.y) for token in token_locations)
+    
+    if token_key in token_map_cache:
+        return token_map_cache[token_key]
+    
+    token_map = np.zeros((MAP_DIMS[0], MAP_DIMS[1]))
+    for token in token_locations:
+        token_map[token.x // CELL_SIZE][token.y // CELL_SIZE] = 1
+    
+    token_map_cache[token_key] = token_map
+    return token_map
+
 class BaseRobot():
     def __init__(self, startpos, targets,end_target, robot_id, special=False):
         self.id = robot_id
@@ -32,8 +49,9 @@ class BaseRobot():
         self.log_rates = []
         
         self.current_target = self._get_new_task()
-        self.end_target = end_target
-        self.targets.append(end_target)
+        if end_target:
+            self.end_target = end_target
+            self.targets.append(end_target)
 
         self._init_images(special)
         self.trans_img = self.base_img
@@ -75,19 +93,36 @@ class BaseRobot():
 
     
     def _handle_collision(self, wall_collided: pygame.rect.Rect):
+        # TODO VECTORIZE THIS, should be easy. Calculate unit vector of collision, reverse it and then add an angle to it 
+        # such that the robot does not keep bouncing off the same walls in a corner
         wall_elasticity = 1
-        if (self.x - self.size[0] / 2) > wall_collided.x and (self.y  - self.size[1] / 2) > wall_collided.y:
-            self.x += wall_elasticity + 1
+        x = self.hitbox.x
+        y = self.hitbox.y
+        #  Collided with wall from the top left
+        if x >= wall_collided.x and y  >= wall_collided.y:
+            self.x += wall_elasticity + 0.2
             self.y += wall_elasticity
-        elif (self.x + self.size[0] / 2) <= wall_collided.x and (self.y - self.size[1] / 2) >= wall_collided.y:
+        # Collided with wall from the top right
+        elif x <= wall_collided.x and y  >= wall_collided.y:
             self.x -= wall_elasticity
-            self.y += wall_elasticity + 1
-        elif (self.x - self.size[0] / 2) >= wall_collided.x and (self.y + self.size[1] / 2) <= wall_collided.y:
+            self.y += wall_elasticity + 0.2
+        # Collided with wall from the bottom left
+        elif x >= wall_collided.x and y  <= wall_collided.y:
             self.x += wall_elasticity
-            self.y -= wall_elasticity + 1
-        elif (self.x + self.size[0] / 2)  <= wall_collided.x and (self.y + self.size[1] / 2) <= wall_collided.y:
-            self.x -= wall_elasticity + 1
+            self.y -= wall_elasticity + 0.2
+        # Collided with wall from the top right
+        elif x  <= wall_collided.x and y <= wall_collided.y:
+            self.x -= wall_elasticity + 0.2
             self.y -= wall_elasticity
+            
+        elif x  <= wall_collided.x and y  == wall_collided.y:
+            self.x -= wall_elasticity 
+        elif x   >= wall_collided.x and y  == wall_collided.y:
+            self.x += wall_elasticity 
+        elif x   == wall_collided.x and y  <= wall_collided.y:
+            self.y -= wall_elasticity 
+        elif x  == wall_collided.x and y  >= wall_collided.y:
+            self.y += wall_elasticity 
         # else:
         #     self.theta += math.pi * 0.5
             
@@ -139,6 +174,24 @@ class BaseRobot():
         else:
             next_target = self.end_target
         return next_target
+    
+    def find_nearby_items(robot, item_map, world_grid):
+        nearby_items = []
+        cell_x = int(robot.x // CELL_SIZE)
+        cell_y = int(robot.y // CELL_SIZE)
+        if (cell_x,cell_y) in nearby_items_cache:
+            return nearby_items_cache[(cell_x,cell_y)]
+        min_range_x = max(0, cell_x - 3)
+        max_range_x = min(MAP_DIMS[0], cell_x + 4)
+        min_range_y = max(0, cell_y - 3)
+        max_range_y = min(MAP_DIMS[1], cell_y + 4)
+
+        for i in range(min_range_x, max_range_x):
+            for j in range(min_range_y, max_range_y):
+                if item_map[i][j] == 1:
+                    nearby_items.extend(world_grid[i][j])
+        nearby_items_cache[(cell_x,cell_y)] = nearby_items
+        return nearby_items
     
     def _save_state(self, time):
         self.log_attitude.append((self.id, time,self.x,self.y,self.theta))
@@ -272,7 +325,7 @@ class TankNeuroRobot(BaseNeuroRobot):
             self.collided = True
             self.sensor[0] = 1
             self.collided_w_wall -= 1
-            self.energy_in_tank = max(self.energy_in_tank - MAX_ENERGY*0.005, 0)
+            self.energy_in_tank = max(self.energy_in_tank - MAX_ENERGY*0.01, 0)
             return nearby_obstacles[collided_walls]
         else:
             self.collided = False
@@ -311,15 +364,19 @@ class TankNeuroRobot(BaseNeuroRobot):
                 self.y -= self.avg_velocity * sin_theta * dt
                 
             rounded_theta = bin_angle(self.theta,0.1)
-            delta_x = self.current_target.x - self.x
-            delta_y = self.current_target.y - self.y 
-            r = np.hypot(delta_x,delta_y)
-         
-            cos_theta = math.cos(rounded_theta)
-            sin_theta = math.sin(rounded_theta)
-            self.angle_w_next_token = calc_angle((cos_theta, sin_theta), (delta_x , delta_y )) / (math.pi)
-            self.error_to_goal = 1 - bound(r / self.shortest_route,0,2)
-            self.closeness.append(self.error_to_goal)
+            if self.current_target:
+                delta_x = self.current_target.x - self.x
+                delta_y = self.current_target.y - self.y 
+                r = np.hypot(delta_x,delta_y)
+                
+                cos_theta = math.cos(rounded_theta)
+                sin_theta = math.sin(rounded_theta)
+                self.angle_w_next_token = calc_angle((cos_theta, sin_theta), (delta_x , delta_y )) / (math.pi)
+                self.error_to_goal = 1 - bound(r / self.shortest_route,0,2)
+                self.closeness.append(self.error_to_goal)
+            else:
+                self.angle_w_next_token = -1
+                self.error_to_goal = -1
         else:
             return
     
@@ -351,6 +408,90 @@ class TankNeuroRobot(BaseNeuroRobot):
         self._update_state(dt, wall_collided, time)
         self._save_state(time)
 
+class SearchingTankNeuroRobot(TankNeuroRobot):
+    def __init__(self, startpos,targets,end_target,robot_id, chromosome,n_hidden=N_HIDDEN, special=False):
+        super().__init__(startpos,targets,end_target,robot_id,chromosome,n_hidden, special)
+        self.visited_cells = set()
+        self.searching = True
+        
+    def _get_new_task(self, nearby_tokens=None):
+        if not self.mission_complete and nearby_tokens:
+            closest_cell_index = find_closest_cell((self.x // CELL_SIZE, self.y // CELL_SIZE), nearby_tokens)
+            next_target = nearby_tokens[closest_cell_index]
+            self.shortest_route = round(calc_distance((self.x ,self.y), (next_target.x,next_target.y)))
+            return next_target
+        else:
+            return None
+
+    def _check_task(self, nearby_tokens):    
+        '''
+    Function to check if we have collided with a token, when this happens the
+    robot obtains a token
+    '''
+        if self.mission_complete:
+            return
+        
+        if not nearby_tokens:
+            self.searching = True
+            self.current_target = None
+            return
+            
+        if nearby_tokens and self.searching:    
+            self.current_target = self._get_new_task(nearby_tokens)
+            self.searching = False # A Target has been found 
+            return
+        
+        elif nearby_tokens and not self.searching:
+            target_reached = self.hitbox.collidelist(self.targets) 
+            if target_reached == -1:
+                return 
+            else:
+                self.targets.pop(target_reached)
+                self.targets_collected += 1
+                self.energy_in_tank = min(self.energy_in_tank+MAX_ENERGY*0.3, MAX_ENERGY)
+                self.searching = True
+                self.current_target = None
+                if len(self.targets) == 0:
+                    self.mission_complete = True
+                return   
+            
+        return 
+    
+    def get_reward(self):
+        closeness = sum(self.closeness)
+        fitness = round(
+            W_TOKEN*self.targets_collected 
+            + closeness*W_CLOSE
+            + self.collided_w_wall*0.1
+            + len(self.visited_cells) * 1.5
+            ,2)
+        print(f"-------{self.id}--------")
+        print(f"T: {self.targets_collected*W_TOKEN}, Q: {W_QUICK*(self.targets_collected/self.time_active)}, \
+              Clo: {closeness*W_CLOSE}, Col: {self.collided_w_wall*W_COL}, Time: {(self.time_active)}, Vis: {(len(self.visited_cells) ) * 1.5}")
+        print(f"Fitness: {fitness}")
+        return fitness
+    
+    def _update_cells_visited(self):
+        current_cell = (self.x // CELL_SIZE, self.y // CELL_SIZE)
+        self.visited_cells.add(current_cell)
+        return
+    
+   
+    def handler(self, dt, world_map:WorldMap, time):
+        self._handle_map_boundaries()
+        
+        nearby_obstacles = self.find_nearby_items(world_map.wall_map,world_map.spatial_grid)
+        token_map = build_token_map(self.targets)
+        nearby_tokens = self.find_nearby_items(token_map,world_map.spatial_grid)
+        self._check_task(nearby_tokens)
+        
+        wall_collided = self._get_collision(nearby_obstacles)
+        self._update_sensors(nearby_obstacles)
+        self._update_tank()
+        self._update_state(dt, wall_collided, time)
+        self._update_cells_visited()
+        self._save_state(time)
+        
 class DebugBot(BaseManualRobot, BaseAutoBot):
     def __init__(self,startpos, targets,end_target, robot_id=1, special=False):
         super().__init__(startpos,targets,end_target,robot_id, special)

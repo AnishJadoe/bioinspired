@@ -1,3 +1,6 @@
+import cProfile
+from functools import lru_cache
+import pstats
 import sys
 import numpy as np
 import math
@@ -68,7 +71,27 @@ def get_init_chromosomes_NN(n_robots, n_inputs, n_outputs, n_hidden, seed=42):
         
     return population
     
+def profile_func(func):
+    """
+    A decorator that profiles a function and saves the profiling data to a file.
+    """
+    def wrapper(*args, **kwargs):
+        file_name = "handler.prof"
+        profiler = cProfile.Profile()
+        profiler.enable()
+        
+        result = func(*args, **kwargs)
+        
+        profiler.disable()
+        profiler.dump_stats(file_name)
+        
+        # Optionally print out the profiling stats
+        stats = pstats.Stats(file_name)
+        stats.sort_stats('cumulative').print_stats(20)
+        
+        return result
     
+    return wrapper
 
 def calc_distance(coord1, coord2):
     """Calculates the distance between 2 points
@@ -85,6 +108,14 @@ def calc_distance(coord1, coord2):
     return dist
 
 angle_cache = {}
+
+EPSILON = 0.01
+def normalize_vector(v):
+    norm = np.linalg.norm(v)
+    if norm < EPSILON:
+        return v  # or return np.zeros_like(v2) if you want a zero vector
+    return v / norm
+
 def calc_angle(v1, v2, cache=False):
     """Calculate the orientation of 2 points with respect to each other.
 
@@ -100,8 +131,8 @@ def calc_angle(v1, v2, cache=False):
         return angle_cache[(v1, v2)]
     
     # Normalize both direction vectors
-    v1_normalized = v1 / np.linalg.norm(v1)
-    v2_normalized = v2 / np.linalg.norm(v2)
+    v1_normalized = normalize_vector(v1)
+    v2_normalized = normalize_vector(v2)
     
     # Calculate the dot product and the angle
     dot_product = np.dot(v1_normalized, v2_normalized)
@@ -153,33 +184,34 @@ def bin_angle(angle, bin_width=0.1):
         """Bins the angle to the nearest bin width."""
         return round(angle / bin_width) * bin_width
 
-def find_closest_cell(agent_location, cells):
-    # Extract the coordinates of the agent's location
-    agent_x, agent_y = agent_location
-    
-    # Initialize variables to keep track of the closest cell index and its distance
+
+# Helper function to convert a list of cells to a hashable type (tuple of tuples)
+def make_hashable(cells):
+    return tuple(tuple(cell) for cell in cells)
+
+@lru_cache(maxsize=128)
+def cached_find_closest_cell(agent_x, agent_y, cells):
     closest_index = None
     min_distance = float('inf')
-    
-    # Iterate through movable cells to find the closest one
+
     for index, cell in enumerate(cells):
-        # Extract the coordinates of the movable cell
-        cell_x , cell_y, _, _ = cell
-        
-        # Calculate the Euclidean distance between the agent and the cell
+        cell_x, cell_y, _, _ = cell
         distance = math.sqrt((agent_x - cell_x // CELL_SIZE)**2 + (agent_y - cell_y // CELL_SIZE)**2)
-        
-        # Update the closest cell index and distance if necessary
         if distance < min_distance:
             min_distance = distance
             closest_index = index
-    
+
     return closest_index
+
+def find_closest_cell(agent_location, cells):
+    agent_x, agent_y = agent_location
+    hashable_cells = make_hashable(cells)
+    return cached_find_closest_cell(agent_x, agent_y, hashable_cells)
 
 def find_nearby_obstacles(robot,world_map:WorldMap):
     nearby_obstacles = []
-    cell_x = int(robot.x // world_map.tile_size)
-    cell_y = int(robot.y // world_map.tile_size)
+    cell_x = int(robot.x // CELL_SIZE)
+    cell_y = int(robot.y // CELL_SIZE)
     min_range_x = max(0, cell_x - 3)
     max_range_x = min(world_map.map_width, cell_x + 4)
     min_range_y = max(0, cell_y - 3)
@@ -187,9 +219,10 @@ def find_nearby_obstacles(robot,world_map:WorldMap):
 
     for i in range(min_range_x, max_range_x):
         for j in range(min_range_y, max_range_y):
-            if world_map.binary_map[i][j] == 1:
+            if world_map.wall_map[i][j] == 1:
                 nearby_obstacles.extend(world_map.spatial_grid[i][j])
     return nearby_obstacles
+
 
 def get_collision(robot, nearby_obstacles):
     """Function to calculate whetere collisions between the walls and the agent have occured """

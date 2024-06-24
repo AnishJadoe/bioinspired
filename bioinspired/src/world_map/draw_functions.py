@@ -98,6 +98,9 @@ def draw_angle_to_next_token(robot,world):
      
 def draw_next_token(token,world):
     pygame.draw.rect(world,BLUE,token)
+
+def draw_line_to_next_token(robot,token,world):
+    pygame.draw.line(world,RED,(robot.x,robot.y), (token.x,token.y), width=2)
     
 def draw_end_pos(endpos,world):
     pygame.draw.rect(world,ORANGE,endpos)
@@ -131,9 +134,9 @@ def draw(robot, world):
 def draw_time(world, time):
     font = pygame.font.SysFont(None, 36)
     txt = font.render(f'Time: {round(time,1)}', True, BLUE)
-    world.blit(txt,(750,50))
+    world.blit(txt,(0.75*MAP_SIZE[0],0.86*MAP_SIZE[1]))
 
 def draw_gen(world, gen):
     font = pygame.font.SysFont(None, 24)
     txt = font.render(f'Gen: {gen}', True, BLUE)
-    world.blit(txt,(800,75))
+    world.blit(txt,(0.75*MAP_SIZE[0],0.9*MAP_SIZE[1]))

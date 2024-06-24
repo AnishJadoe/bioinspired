@@ -33,15 +33,15 @@ class ManualController(BaseController):
     
     def calculate_motor_speed(self, event, vl,vr):
         
-        if event.type in {pygame.KEYDOWN, pygame.KEYUP}:
+        if event.type in {pygame.KEYDOWN}:
             if event.key == pygame.locals.K_a:
-                vl += 0.005 * M2P
+                vl = min(MAX_SPEED, vl+0.005 * M2P)
             elif event.key == pygame.locals.K_s:
-                vl -= 0.005 * M2P
+                vl = max(MIN_SPEED, vl-0.005 * M2P)
             elif event.key == pygame.locals.K_k:
-                vr += 0.005 * M2P
+                vr = min(MAX_SPEED, vr + 0.005 * M2P)
             elif event.key == pygame.locals.K_j:
-                vr -= 0.005 * M2P
+                vr = max(MIN_SPEED, vr - 0.005 * M2P)
                 
         return (vl,vr)
 
