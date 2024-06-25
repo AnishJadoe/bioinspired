@@ -35,16 +35,17 @@ class ManualController(BaseController):
         
         if event.type in {pygame.KEYDOWN}:
             if event.key == pygame.locals.K_a:
-                vl = min(MAX_SPEED, vl+0.005 * M2P)
+                vl = min(MAX_SPEED, vl+25)
             elif event.key == pygame.locals.K_s:
-                vl = max(MIN_SPEED, vl-0.005 * M2P)
+                vl = max(MIN_SPEED, vl-25)
             elif event.key == pygame.locals.K_k:
-                vr = min(MAX_SPEED, vr + 0.005 * M2P)
+                vr = min(MAX_SPEED, vr + 25)
             elif event.key == pygame.locals.K_j:
-                vr = max(MIN_SPEED, vr - 0.005 * M2P)
+                vr = max(MIN_SPEED, vr - 25)
                 
         return (vl,vr)
 
+                
 class NeuroController(BaseController):
     def __init__(self,chromosome,n_inputs=N_INPUTS,n_outputs=N_OUTPUTS, n_hidden=N_HIDDEN):
         super().__init__()

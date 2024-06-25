@@ -8,4 +8,4 @@ num_tokens = N_TOKENS
 
 map_gen = MapGenerator(width=width, height=height, start_pos=start_pos, num_tokens=num_tokens)
 map_gen.generate_map()
-map_gen.save_map_to_file("bioinspired/src/world_map/maps/random_map_1.txt")
+map_gen.save_map_to_file("bioinspired/src/world_map/maps/random_map_small.txt")

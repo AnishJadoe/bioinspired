@@ -108,6 +108,13 @@ def draw_end_pos(endpos,world):
 def draw_robot_bb(robot,world):
     pygame.draw.rect(world,RED,robot.hitbox, width=1)
 
+def draw_visited_tiles(visited_cells, spatial_grid,world, color=DARK_GREEN ):
+    for cell in visited_cells:
+        x = cell[0]
+        y = cell[1]
+        cell_to_draw = spatial_grid[x][y]
+        pygame.draw.rect(world,color,cell_to_draw[0], width=1)
+        
 
 # def draw_next_token(robot,world):
 #     pygame.draw.line(world,BLUE, (robot.x,robot.y), (robot.next_token.x,robot.next_token.y))

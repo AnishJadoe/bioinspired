@@ -10,12 +10,12 @@ from src.runners.genetic_algorithm import GeneticAlgorithmRunner
 from src.utility.constants import *
 # seeds = [30,42,50,70,80,100]
 seeds = [30,42,50]
-epochs = 30
+epochs = 75
 time = 30 * 1000 # milliseconds
 n_robots = 80
 ls_cross_rate = [1]
 ls_mut_rate = [0.8,0.9,0.85]
-world = "bioinspired/src/world_map/maps/random_map_1.txt"
+world = "bioinspired/src/world_map/maps/random_map_small.txt"
 wm = WorldMap(skeleton_file=world)
 for seed in seeds:
     np.random.seed(seed)

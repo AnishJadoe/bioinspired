@@ -59,6 +59,14 @@ class WorldMap:
         x, y = token.x // self.tile_size, token.y // self.tile_size
         self.spatial_grid[int(x)][int(y)].append(token)
         
+    def _add_movable_tile(self,move_tile):
+        x, y = move_tile.x // self.tile_size, move_tile.y // self.tile_size
+        self.spatial_grid[int(x)][int(y)].append(move_tile)
+        
+    def _add_start_tile(self,start_tile):
+        x, y = start_tile.x // self.tile_size, start_tile.y // self.tile_size
+        self.spatial_grid[int(x)][int(y)].append(start_tile)
+        
     def _load_skeleton_file(self, file):
         return open(file, "r")
     
@@ -85,9 +93,11 @@ class WorldMap:
                 if char == "-":
                     self._draw_move_tiles(obj)
                     self.movable_tiles.append(obj)
+                    self._add_movable_tile(obj)
                 if char == "S":
                     self._draw_start_position(obj)
                     self.start_pos = obj
+                    self._add_start_tile(obj)
                 if char == "E":
                     self._draw_end_position(obj)
                     self.end_pos = obj

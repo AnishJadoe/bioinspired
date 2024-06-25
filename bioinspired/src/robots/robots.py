@@ -7,7 +7,7 @@ from src.world_map.world_map import WorldMap
 from ..utility.constants import *
 from ..controllers.controllers import ManualController, NeuroController
 
-ROBOT_WIDTH = 15
+ROBOT_WIDTH = 25
 MAX_SPEED = 128
 
 token_map_cache = {}
@@ -175,16 +175,16 @@ class BaseRobot():
             next_target = self.end_target
         return next_target
     
-    def find_nearby_items(robot, item_map, world_grid):
+    def find_nearby_items(robot, item_map, world_grid, min_range=3,max_range=4):
         nearby_items = []
         cell_x = int(robot.x // CELL_SIZE)
         cell_y = int(robot.y // CELL_SIZE)
         if (cell_x,cell_y) in nearby_items_cache:
             return nearby_items_cache[(cell_x,cell_y)]
-        min_range_x = max(0, cell_x - 3)
-        max_range_x = min(MAP_DIMS[0], cell_x + 4)
-        min_range_y = max(0, cell_y - 3)
-        max_range_y = min(MAP_DIMS[1], cell_y + 4)
+        min_range_x = max(0, cell_x - min_range)
+        max_range_x = min(MAP_DIMS[0], cell_x + max_range)
+        min_range_y = max(0, cell_y - min_range)
+        max_range_y = min(MAP_DIMS[1], cell_y + max_range)
 
         for i in range(min_range_x, max_range_x):
             for j in range(min_range_y, max_range_y):
@@ -232,7 +232,72 @@ class BaseManualRobot(BaseRobot):
         wall_collided = self._get_collision(nearby_obstacles)
         self._update_state(dt, wall_collided, event)
         
-       
+class ForagingManualRobot(BaseManualRobot):
+    def __init__(self, startpos,targets,end_target,robot_id=1, special=False):
+        super().__init__(startpos,targets,end_target,robot_id, special)
+        self.controller = ManualController()
+        self.carrying = False
+        self.carried_target_id = None
+        self.startpos = startpos
+        self.targets_returned = 0
+
+
+    def _move_token(self):
+        self.current_target.x = self.x
+        self.current_target.y = self.y
+        
+    def _check_task(self):
+        '''
+        Function to check if we have collided with a token, when this happens the
+        robot obtains a token
+        '''
+        target_reached = self.hitbox.collidelist(self.targets) 
+        if target_reached == -1:
+            return
+         
+        if self.current_target == self.targets[target_reached] and not self.carrying:
+            self.carrying = True
+            self.carried_target_id = target_reached
+        
+        if self.carrying:
+            start_pos_cell_x = self.startpos[0] // CELL_SIZE
+            start_pos_cell_y = self.startpos[1] // CELL_SIZE
+            # Better carrying logic needed 
+            self._move_token()
+            min_range_x = -1
+            max_range_x = 2
+            min_range_y = -1
+            max_range_y = 2
+            base_range = []
+            for i in range(min_range_x,max_range_x):
+                for j in range(min_range_y,max_range_y):
+                    base_range.append((start_pos_cell_x + i, start_pos_cell_y + j))
+        
+            back_at_base = (self.x // CELL_SIZE,self.y // CELL_SIZE) in  base_range
+            # print(f"({self.x // CELL_SIZE},{self.y // CELL_SIZE}) == ({self.startpos[0] // CELL_SIZE},{self.startpos[1] // CELL_SIZE})")
+            if back_at_base:
+                print("Got Target at location")
+                self.targets.pop(self.carried_target_id)
+                self.carrying = False
+                self.targets_returned += 1
+                self.current_target = self._get_new_task()
+        # self.current_target = self._get_new_task()
+        return 
+    
+    def _get_new_task(self):
+        if not self.mission_complete:
+            closest_cell_index = find_closest_cell((self.x // CELL_SIZE, self.y // CELL_SIZE), self.targets)
+            next_target = self.targets[closest_cell_index]
+        else:
+            next_target = self.end_target
+        return next_target
+    
+    def handler(self, dt, nearby_obstacles,event=None):
+        self._handle_map_boundaries()
+        wall_collided = self._get_collision(nearby_obstacles)
+        self._check_task()
+        self._update_state(dt, wall_collided, event)
+    
 class BaseAutoBot(BaseRobot):
     def __init__(self, startpos,targets,end_target,robot_id, special=False):
         super().__init__(startpos,targets,end_target,robot_id, special)
@@ -413,6 +478,11 @@ class SearchingTankNeuroRobot(TankNeuroRobot):
         super().__init__(startpos,targets,end_target,robot_id,chromosome,n_hidden, special)
         self.visited_cells = set()
         self.searching = True
+        self.mental_map = np.zeros((MAP_DIMS[0],
+                            MAP_DIMS[1]))
+        self.current_view = self._get_current_view()
+        self.added_walls = False
+        self.map_size = 0
         
     def _get_new_task(self, nearby_tokens=None):
         if not self.mission_complete and nearby_tokens:
@@ -422,7 +492,19 @@ class SearchingTankNeuroRobot(TankNeuroRobot):
             return next_target
         else:
             return None
-
+        
+    def _get_current_view(self):
+        cell_x = self.x // CELL_SIZE
+        cell_y = self.y // CELL_SIZE
+        min_range_x = max(0, cell_x - 2)
+        max_range_x = min(MAP_DIMS[0], cell_x + 3)
+        min_range_y = max(0, cell_y - 2)
+        max_range_y = min(MAP_DIMS[1], cell_y + 3)
+        
+        current_view = self.mental_map[min_range_x:max_range_x,min_range_y:max_range_y]
+        
+        return current_view
+        
     def _check_task(self, nearby_tokens):    
         '''
     Function to check if we have collided with a token, when this happens the
@@ -457,23 +539,72 @@ class SearchingTankNeuroRobot(TankNeuroRobot):
             
         return 
     
+    def _update_state(self, dt: float, wall_collided: pygame.Rect,time: float):
+            
+        if not self.tank_empty:
+            self.time_active = time
+            self.state = np.array([self.avg_velocity / MAX_SPEED, self.error_to_goal,self.angle_w_next_token,self.omega/(2*math.pi),self.energy_in_tank / MAX_ENERGY ,self.completed_map,*self.current_view.flatten(),*self.sensor[1:]]).reshape(-1,1)
+            self.vl,self.vr = self.controller.calculate_motor_speed(self.state)
+            self.avg_velocity = (self.vl + self.vr) / 2
+            self.omega = (self.vl - self.vr) / self.moment_of_inertia
+            self.theta += self.omega * dt
+            
+            if self.theta >= math.pi:
+                self.theta -= 2 * math.pi
+            if self.theta <= -math.pi:
+                self.theta += 2 * math.pi
+                
+            if self.collided:
+                self._handle_collision(wall_collided)
+            else:             
+                cos_theta = math.cos(-self.theta)
+                sin_theta = math.sin(-self.theta)
+                self.x += self.avg_velocity * cos_theta * dt
+                self.y -= self.avg_velocity * sin_theta * dt
+                
+            rounded_theta = bin_angle(self.theta,0.1)
+            if self.current_target:
+                delta_x = self.current_target.x - self.x
+                delta_y = self.current_target.y - self.y 
+                r = np.hypot(delta_x,delta_y)
+                
+                cos_theta = math.cos(rounded_theta)
+                sin_theta = math.sin(rounded_theta)
+                self.angle_w_next_token = calc_angle((cos_theta, sin_theta), (delta_x , delta_y )) / (math.pi)
+                self.error_to_goal = 1 - bound(r / self.shortest_route,0,2)
+                self.closeness.append(self.error_to_goal)
+            else:
+                self.angle_w_next_token = -1
+                self.error_to_goal = -1
+        else:
+            return
+        
     def get_reward(self):
         closeness = sum(self.closeness)
         fitness = round(
-            W_TOKEN*self.targets_collected 
+            3*self.targets_collected 
             + closeness*W_CLOSE
             + self.collided_w_wall*0.1
-            + len(self.visited_cells) * 1.5
+            + len(self.visited_cells) * 0.3
             ,2)
         print(f"-------{self.id}--------")
-        print(f"T: {self.targets_collected*W_TOKEN}, Q: {W_QUICK*(self.targets_collected/self.time_active)}, \
-              Clo: {closeness*W_CLOSE}, Col: {self.collided_w_wall*W_COL}, Time: {(self.time_active)}, Vis: {(len(self.visited_cells) ) * 1.5}")
+        print(f"T: {self.targets_collected*3}, Q: {W_QUICK*(self.targets_collected/self.time_active)}, \
+              Clo: {closeness*W_CLOSE}, Col: {self.collided_w_wall*0.1}, Time: {(self.time_active)}, Vis: {(len(self.visited_cells) ) * 0.75}")
         print(f"Fitness: {fitness}")
         return fitness
     
-    def _update_cells_visited(self):
-        current_cell = (self.x // CELL_SIZE, self.y // CELL_SIZE)
-        self.visited_cells.add(current_cell)
+
+    def _update_mental_map(self, walls):
+        if not self.added_walls:
+            self.mental_map = self.mental_map - walls[:self.mental_map.shape[0],:self.mental_map.shape[1]]
+            self.map_size = np.sum(self.mental_map == 0)
+            self.added_walls = True
+            
+        cell_x = int(self.x // CELL_SIZE)
+        cell_y = int(self.y // CELL_SIZE)
+        self.visited_cells.add((cell_x,cell_y))
+        self.mental_map[cell_x][cell_y] = 1
+        self.completed_map = len(self.visited_cells)/self.map_size 
         return
     
    
@@ -482,14 +613,14 @@ class SearchingTankNeuroRobot(TankNeuroRobot):
         
         nearby_obstacles = self.find_nearby_items(world_map.wall_map,world_map.spatial_grid)
         token_map = build_token_map(self.targets)
-        nearby_tokens = self.find_nearby_items(token_map,world_map.spatial_grid)
+        nearby_tokens = self.find_nearby_items(token_map,world_map.spatial_grid, min_range=6,max_range=7)
         self._check_task(nearby_tokens)
         
         wall_collided = self._get_collision(nearby_obstacles)
         self._update_sensors(nearby_obstacles)
         self._update_tank()
+        self._update_mental_map(world_map.wall_map)
         self._update_state(dt, wall_collided, time)
-        self._update_cells_visited()
         self._save_state(time)
         
 class DebugBot(BaseManualRobot, BaseAutoBot):
@@ -504,5 +635,4 @@ class DebugBot(BaseManualRobot, BaseAutoBot):
         self._update_state(dt, wall_collided, event)
         
 
-    
         
