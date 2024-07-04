@@ -10,7 +10,7 @@ import pstats
 import cProfile
 from ..utility.constants import *
 
-
+        
 def profile_update_sensors_to_file(robot, nearby_obstacles, world_map):
     file_name = "run_simulation.prof"
     profiler = cProfile.Profile()
@@ -39,7 +39,7 @@ def run_simulation(wm: WorldMap, time,robot_type,  pop, n_robots, gen):
     """
 
     wm.build_map()
-    print(f"Walls in map: {len(wm.walls)}")
+    print(f"Tokens in map: {len(wm.tokens)}")
     clock = pygame.time.Clock()
     robots = list()
     pygame.init()
@@ -68,13 +68,12 @@ def run_simulation(wm: WorldMap, time,robot_type,  pop, n_robots, gen):
         clock.tick(30)
         timestamp = (pygame.time.get_ticks()/1000)
         
-        if ((pygame.time.get_ticks() - loadtime)/1000) >= time:
+        if ((pygame.time.get_ticks() - loadtime)/1000) >= time or len(wm.tokens) == 0:
             running = False
             
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-                
         # tanks_empty = [robot.tank_empty for robot in robots]
         # if all(tanks_empty):
         #     all_tanks_empty = True
@@ -93,8 +92,8 @@ def run_simulation(wm: WorldMap, time,robot_type,  pop, n_robots, gen):
             # for cell in robot.visited_cells:
             #     visited_cells.add(cell)
             draw_robot(robot,wm.surf)
-            if token_to_collect:
-                draw_line_to_next_token(robot,token_to_collect,wm.surf)
+            # if token_to_collect:
+            #     draw_line_to_next_token(robot,token_to_collect,wm.surf)
                 
         # if token_to_collect:
         #     draw_next_token(tokens_collected[-1], wm.surf)
@@ -116,6 +115,7 @@ def run_simulation(wm: WorldMap, time,robot_type,  pop, n_robots, gen):
         draw_time(wm.surf, ((pygame.time.get_ticks() - loadtime)/1000))
         draw_gen(wm.surf,gen)
         lasttime = pygame.time.get_ticks()
+        
         pygame.display.update()
 
     pygame.quit()
@@ -217,24 +217,25 @@ def manual_mode(wm: WorldMap, robot:BaseRobot, drawfunc):
     lasttime = pygame.time.get_ticks()
     loadtime = lasttime
     running = True
-    robot = robot(startpos=(wm.start_pos.x, wm.start_pos.y),targets=wm.tokens, end_target=wm.end_pos)
+    robot = robot(startpos=wm.start_pos,targets=wm.tokens, end_target=wm.end_pos)
     # Simulation loop
     while running:
         if robot.mission_complete:
             print(f"Congrats you won within {(pygame.time.get_ticks()- loadtime)/1000} seconds")
             running=False
         clock.tick(30)
-        wm.update_map()
 
         
+        wm.update_map()
         nearby_obstacles = find_nearby_obstacles(robot,wm)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             robot.handler(nearby_obstacles=nearby_obstacles,dt=dt,event=event)  
+            
         robot.handler(nearby_obstacles=nearby_obstacles, dt=dt)
     
-        
+        draw_line_to_next_token(robot,robot.current_target,wm.surf)
         draw_robot(robot,wm.surf)
         draw_time(wm.surf, (pygame.time.get_ticks()- loadtime)/1000)
         drawfunc(robot,wm)

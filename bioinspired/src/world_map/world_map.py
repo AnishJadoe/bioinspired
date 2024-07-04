@@ -3,6 +3,21 @@ import numpy as np
 from ..utility.constants import *
 
 
+class Tile():
+    def __init__(self, tile, tile_id):
+        self.hitbox = tile
+        self.x = tile.x
+        self.y = tile.y
+        self.id = tile_id
+        
+class Target():
+    def __init__(self, target, tile_id):
+        self.hitbox = target
+        self.being_carried = False
+        self.x = target.x
+        self.y = target.y
+        self.id = tile_id
+    
 class WorldMap:
     def __init__(self, skeleton_file):
         
@@ -71,6 +86,7 @@ class WorldMap:
         return open(file, "r")
     
     def _parse_skeleton_file(self):
+        tile_id = 0
         skeleton_file = self._load_skeleton_file(self.skeleton_file)
         for y, line in enumerate(skeleton_file):
             for x, char in enumerate(line):
@@ -81,42 +97,52 @@ class WorldMap:
                     self.tile_size
                     )
                 if char == "*":
-                    self._draw_wall(obj)
-                    self.walls.append(obj)
+                    wall = Tile(obj, tile_id)
+                    self._draw_wall(wall)
+                    self.walls.append(wall)
                     self.wall_map[x][y] = 1
-                    self._add_obstacle(obj)
+                    self._add_obstacle(wall)
                 if char == "T":
-                    self._draw_token(obj)
-                    self.tokens.append(obj)
+                    target = Target(obj, tile_id)
+                    self._draw_token(target)
+                    self.tokens.append(target)
                     self.token_map[x][y] = 1
-                    self._add_token(obj)
+                    self._add_token(target)
                 if char == "-":
-                    self._draw_move_tiles(obj)
-                    self.movable_tiles.append(obj)
-                    self._add_movable_tile(obj)
+                    move_tile = Tile(obj, tile_id)
+                    self._draw_move_tiles(move_tile)
+                    self.movable_tiles.append(move_tile)
+                    self._add_movable_tile(move_tile)
                 if char == "S":
-                    self._draw_start_position(obj)
-                    self.start_pos = obj
-                    self._add_start_tile(obj)
+                    start_pos = Tile(obj, tile_id)
+                    self._draw_start_position(start_pos)
+                    self._add_start_tile(start_pos)
+                    self.start_pos = start_pos
                 if char == "E":
-                    self._draw_end_position(obj)
-                    self.end_pos = obj
+                    end_pos = Tile(obj, tile_id)
+                    self._draw_end_position(end_pos)
+                    self.end_pos = end_pos
+                tile_id += 1
         return
             
-    def _draw_wall(self, obj):
-        pygame.draw.rect(self.surf, BLACK, obj)
+    def _draw_wall(self, obj: Tile):
+        pygame.draw.rect(self.surf, BLACK, obj.hitbox)
     
-    def _draw_token(self, obj):
-        pygame.draw.rect(self.surf, YELLOW, obj)
-      
-    def _draw_move_tiles(self, obj):
-        pygame.draw.rect(self.surf, WHITE, obj)
+    def _draw_token(self, obj: Target):
+        if obj.being_carried:
+            obj.hitbox.topleft = (obj.x,obj.y)
+            pygame.draw.rect(self.surf, DARK_GREEN, obj.hitbox)
+        else:
+            pygame.draw.rect(self.surf, YELLOW, obj.hitbox)
+
+    def _draw_move_tiles(self, obj: Tile):
+        pygame.draw.rect(self.surf, WHITE, obj.hitbox)
 
     def _draw_start_position(self, obj: pygame.Rect):
-        pygame.draw.rect(self.surf, RED, obj)
+        pygame.draw.rect(self.surf, RED, obj.hitbox)
     
-    def _draw_end_position(self, obj):
-        pygame.draw.rect(self.surf, ORANGE, obj)
+    def _draw_end_position(self, obj: Tile):
+        pygame.draw.rect(self.surf, ORANGE, obj.hitbox)
     
     def update_map(self):
 

@@ -10,9 +10,9 @@ from src.runners.genetic_algorithm import GeneticAlgorithmRunner
 from src.utility.constants import *
 # seeds = [30,42,50,70,80,100]
 seeds = [30,42,50]
-epochs = 75
-time = 90 #s
-n_robots = 5
+epochs = 25
+time = 120 #s
+n_robots = 10
 ls_cross_rate = [1]
 ls_mut_rate = [0.8]
 world = "bioinspired/src/world_map/maps/random_map_small.txt"
