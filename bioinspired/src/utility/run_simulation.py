@@ -51,7 +51,7 @@ def run_simulation(wm: WorldMap, time,robot_type,  pop, n_robots, gen):
             special = False
             
         robots.append(
-            robot_type(robot_id=i, startpos=(wm.start_pos.x, wm.start_pos.y),targets=wm.tokens.copy(), end_target=wm.end_pos, 
+            robot_type(robot_id=i, startpos=wm.start_pos,targets=wm.tokens, end_target=wm.end_pos, 
                   chromosome=pop[i], special=special)
         )
 
@@ -66,45 +66,51 @@ def run_simulation(wm: WorldMap, time,robot_type,  pop, n_robots, gen):
     # Simulation loop
     while (not all_tanks_empty and running):
         clock.tick(30)
+        timestamp = (pygame.time.get_ticks()/1000)
+        
+        if ((pygame.time.get_ticks() - loadtime)/1000) >= time:
+            running = False
+            
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-        timestamp = (pygame.time.get_ticks()/1000)
-        #dt = (pygame.time.get_ticks() - lasttime) / 1000
-        tanks_empty = [robot.tank_empty for robot in robots]
-        if all(tanks_empty):
-            all_tanks_empty = True
-            continue
+                
+        # tanks_empty = [robot.tank_empty for robot in robots]
+        # if all(tanks_empty):
+        #     all_tanks_empty = True
+        #     continue
+        
         wm.update_map()
         for robot in robots:
             if not robot.mission_complete:
                 robot.handler(world_map=wm, dt=dt, time=timestamp)
                 token_to_collect = robot.current_target
-                if token_to_collect not in tokens_collected:
-                    tokens_collected.append(token_to_collect)
+                # if token_to_collect not in tokens_collected:
+                #     tokens_collected.append(token_to_collect)
             elif robot.mission_complete:
                 print(f"Robot {robot.id} finished")
                 running = False
-            for cell in robot.visited_cells:
-                visited_cells.add(cell)
+            # for cell in robot.visited_cells:
+            #     visited_cells.add(cell)
             draw_robot(robot,wm.surf)
-            # if token_to_collect:
-            #     draw_line_to_next_token(robot,token_to_collect,wm.surf)
+            if token_to_collect:
+                draw_line_to_next_token(robot,token_to_collect,wm.surf)
+                
         # if token_to_collect:
         #     draw_next_token(tokens_collected[-1], wm.surf)
         # else:
         #     draw_end_pos(wm.end_pos,wm.surf)
         
-        best_robot = 0
-        best_cells_visited = 0
-        for idx,robot in enumerate(robots):
-            if robot.visited_cells:
-                if len(robot.visited_cells) > best_cells_visited:
-                    best_cells_visited = len(robot.visited_cells)
-                    best_robot = idx
+        # best_robot = 0
+        # best_cells_visited = 0
+        # for idx,robot in enumerate(robots):
+        #     if robot.visited_cells:
+        #         if len(robot.visited_cells) > best_cells_visited:
+        #             best_cells_visited = len(robot.visited_cells)
+        #             best_robot = idx
                     
-        draw_visited_tiles(visited_cells,wm.spatial_grid,wm.surf, GRAY)
-        draw_visited_tiles(robots[best_robot].visited_cells,wm.spatial_grid,wm.surf)
+        # draw_visited_tiles(visited_cells,wm.spatial_grid,wm.surf, GRAY)
+        # draw_visited_tiles(robots[best_robot].visited_cells,wm.spatial_grid,wm.surf)
             
             
         draw_time(wm.surf, ((pygame.time.get_ticks() - loadtime)/1000))
